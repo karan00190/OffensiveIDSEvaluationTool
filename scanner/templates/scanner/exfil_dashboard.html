@@ -1,0 +1,232 @@
+<!-- scanner/templates/scanner/exfil_dashboard.html -->
+{% extends "scanner/base.html" %} 
+{% block title %}Exfiltration Results{% endblock %} 
+{% block extra_css %}
+<style>
+  .pg-eyebrow {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 2px;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    margin-bottom: 6px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .pg-eyebrow::before {
+    content: "";
+    width: 24px;
+    height: 1px;
+    background: var(--cyan-dim);
+  }
+  .pg-title {
+    font-family: var(--cond);
+    font-size: 28px;
+    font-weight: 700;
+    letter-spacing: 2px;
+  }
+  .pg-sub {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text-dim);
+    margin-top: 4px;
+  }
+  .tech-dns {
+    border-color: rgba(0, 212, 255, 0.3);
+    color: var(--cyan);
+    background: rgba(0, 212, 255, 0.06);
+  }
+  .tech-http {
+    border-color: rgba(255, 170, 0, 0.3);
+    color: var(--amber);
+    background: rgba(255, 170, 0, 0.06);
+  }
+  .tech-icmp {
+    border-color: rgba(255, 68, 85, 0.3);
+    color: var(--red);
+    background: rgba(255, 68, 85, 0.06);
+  }
+  .tech-badge {
+    font-family: var(--mono);
+    font-size: 9px;
+    letter-spacing: 0.5px;
+    padding: 2px 7px;
+    border-radius: 3px;
+    border: 1px solid;
+    display: inline-block;
+  }
+  .prof-badge {
+    font-family: var(--mono);
+    font-size: 9px;
+    padding: 2px 7px;
+    border-radius: 3px;
+    background: var(--bg-raised);
+    border: 1px solid var(--border);
+    color: var(--text-dim);
+  }
+  .ids-detected {
+    color: var(--red);
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 600;
+  }
+  .ids-evaded {
+    color: var(--green);
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 600;
+  }
+  .ids-unknown {
+    color: var(--text-dim);
+    font-family: var(--mono);
+    font-size: 11px;
+  }
+</style>
+
+{% endblock %} 
+{% block content %}
+<div style="max-width: 1100px">
+  <div
+    style="
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-between;
+      margin-bottom: 1.5rem;
+      flex-wrap: wrap;
+      gap: 1rem;
+    "
+  >
+    <div>
+      <div class="pg-eyebrow">IDS Evaluation</div>
+      <div class="pg-title">Data Exfiltration Results</div>
+      <div class="pg-sub">
+        DNS TUNNELLING · HTTP INJECTION · ICMP STUFFING &nbsp;·&nbsp; {{
+        total_runs }} RUNS
+      </div>
+    </div>
+  </div>
+
+  <div class="stat-grid" style="margin-bottom: 1.5rem">
+    <div class="stat-card">
+      <div class="stat-label">Total Runs</div>
+      <div class="stat-value">{{ total_runs }}</div>
+    </div>
+    <div class="stat-card danger">
+      <div class="stat-label">IDS Detected</div>
+      <div class="stat-value risk-HIGH">{{ detected_runs }}</div>
+    </div>
+    <div class="stat-card success">
+      <div class="stat-label">IDS Evaded</div>
+      <div class="stat-value" style="color: var(--green)">
+        {{ evaded_runs }}
+      </div>
+    </div>
+    <div class="stat-card warning">
+      <div class="stat-label">Pending Review</div>
+      <div class="stat-value" style="color: var(--amber)">
+        {{ unknown_runs }}
+      </div>
+    </div>
+  </div>
+
+  <div class="section-title" style="margin-bottom: 1rem">All Exfil Runs</div>
+  <div class="card">
+    {% if results %}
+    <div style="overflow-x: auto">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Technique</th>
+            <th>Profile</th>
+            <th>Target</th>
+            <th>Chunks</th>
+            <th>Sent</th>
+            <th>Errors</th>
+            <th>Duration</th>
+            <th>IDS Status</th>
+            <th>When</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for r in results %}
+          <tr>
+            <td class="mono" style="font-size: 11px; color: var(--text-dim)">
+              {{ r.pk }}
+            </td>
+            <td>
+              <span
+                class="tech-badge {% if r.technique == 'dns' %}tech-dns {% elif r.technique == 'http' %}tech-http {% else %}tech-icmp{% endif %}"
+              >
+                {{ r.technique|upper }}
+              </span>
+            </td>
+            <td><span class="prof-badge">{{ r.profile }}</span></td>
+            <td class="mono" style="font-size: 11px; color: var(--cyan)">
+              {{ r.target|default:"—" }}
+            </td>
+            <td class="mono" style="font-size: 12px">{{ r.total_chunks }}</td>
+            <td class="mono" style="font-size: 12px; color: var(--green)">
+              {{ r.successful }}
+            </td>
+            <td class="mono" style="font-size: 12px; color: var(--red)">
+              {{ r.errors }}
+            </td>
+            <td class="mono" style="font-size: 11px; color: var(--text-dim)">
+              {{ r.duration_sec|floatformat:1 }}s
+            </td>
+            <td>
+              {% if r.ids_detected is None %}<span class="ids-unknown"
+                >Unknown</span
+              >
+              {% elif r.ids_detected %}<span class="ids-detected"
+                >⚠ Detected</span
+              >
+              {% else %}<span class="ids-evaded">✓ Evaded</span>{% endif %}
+            </td>
+            <td class="mono" style="font-size: 10px; color: var(--text-dim)">
+              {{ r.created_at|timesince }} ago
+            </td>
+            <td>
+              <a
+                href="{% url 'scanner:exfil_detail' r.pk %}"
+                style="
+                  font-family: var(--mono);
+                  font-size: 10px;
+                  color: var(--cyan-dim);
+                "
+                >Detail →</a
+              >
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div style="text-align: center; padding: 5rem 2rem; color: var(--text-dim)">
+      <i
+        class="bi bi-arrow-up-right-circle"
+        style="
+          font-size: 40px;
+          display: block;
+          margin-bottom: 1rem;
+          color: var(--border-md);
+        "
+      ></i>
+      <div style="font-family: var(--mono); font-size: 12px">
+        No exfiltration runs yet.
+      </div>
+      <div
+        style="font-family: var(--mono); font-size: 11px; margin-top: 0.5rem"
+      >
+        Run:
+        <code>python agent.py --exfil --technique dns --profile burst</code>
+      </div>
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,438 @@
+{% extends "scanner/base.html" %} 
+{% block title %}Agents{% endblock %} 
+
+{% block extra_css %}
+<style>
+  .pg-eyebrow {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 2px;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    margin-bottom: 6px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .pg-eyebrow::before {
+    content: "";
+    width: 24px;
+    height: 1px;
+    background: var(--cyan-dim);
+  }
+  .pg-title {
+    font-family: var(--cond);
+    font-size: 28px;
+    font-weight: 700;
+    letter-spacing: 2px;
+  }
+  .pg-sub {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text-dim);
+    margin-top: 4px;
+    letter-spacing: 0.5px;
+  }
+
+  .agent-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 1rem;
+    margin-bottom: 2rem;
+  }
+
+  .agent-card {
+    background: var(--bg-panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+    transition:
+      border-color 0.2s,
+      transform 0.2s;
+    position: relative;
+  }
+  .agent-card:hover {
+    border-color: var(--border-md);
+    transform: translateY(-2px);
+  }
+  .agent-card::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: var(--ac, var(--border));
+  }
+  .agent-card.online {
+    --ac: var(--green);
+  }
+  .agent-card.offline {
+    --ac: var(--text-dim);
+  }
+  .agent-card.inactive {
+    --ac: var(--red);
+  }
+
+  .ac-header {
+    padding: 1rem 1.25rem;
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+  }
+  .ac-left {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .ac-avatar {
+    width: 40px;
+    height: 40px;
+    border-radius: 8px;
+    border: 1px solid var(--border-md);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    flex-shrink: 0;
+  }
+  .agent-card.online .ac-avatar {
+    color: var(--green);
+    border-color: rgba(0, 255, 136, 0.3);
+    background: rgba(0, 255, 136, 0.06);
+  }
+  .agent-card.offline .ac-avatar {
+    color: var(--text-dim);
+    background: var(--bg-raised);
+  }
+  .agent-card.inactive .ac-avatar {
+    color: var(--red);
+    border-color: rgba(255, 68, 85, 0.3);
+    background: rgba(255, 68, 85, 0.06);
+  }
+
+  .ac-id {
+    font-family: var(--mono);
+    font-size: 13px;
+    color: var(--cyan);
+    font-weight: 500;
+  }
+  .ac-name {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--text-dim);
+    margin-top: 2px;
+  }
+
+  .ac-status {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.5px;
+    flex-shrink: 0;
+  }
+  .status-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+  }
+  .dot-online {
+    background: var(--green);
+    box-shadow: 0 0 6px var(--green);
+    animation: blink 2s ease-in-out infinite;
+  }
+  .dot-offline {
+    background: var(--text-dim);
+  }
+  .dot-inactive {
+    background: var(--red);
+  }
+  .st-online {
+    color: var(--green);
+  }
+  .st-offline {
+    color: var(--text-dim);
+  }
+  .st-inactive {
+    color: var(--red);
+  }
+
+  .ac-divider {
+    height: 1px;
+    background: var(--border);
+    margin: 0;
+  }
+
+  .ac-stats {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    padding: 0.875rem 1.25rem;
+    gap: 0.5rem;
+  }
+  .ac-stat {
+    text-align: center;
+  }
+  .ac-stat-val {
+    font-family: var(--mono);
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--text-pri);
+  }
+  .ac-stat-lbl {
+    font-family: var(--mono);
+    font-size: 9px;
+    letter-spacing: 1px;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    margin-top: 2px;
+  }
+
+  .ac-footer {
+    padding: 0.75rem 1.25rem;
+    background: var(--bg-raised);
+    border-top: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+  }
+  .ac-lastseen {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--text-dim);
+  }
+  .ac-actions {
+    display: flex;
+    gap: 0.5rem;
+  }
+  .ac-btn {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.5px;
+    padding: 4px 10px;
+    border-radius: 3px;
+    border: 1px solid var(--border);
+    color: var(--text-dim);
+    text-decoration: none;
+    transition: all 0.15s;
+    cursor: pointer;
+    background: none;
+  }
+  .ac-btn:hover {
+    border-color: var(--cyan);
+    color: var(--cyan);
+    background: rgba(0, 212, 255, 0.06);
+  }
+  .ac-btn.danger:hover {
+    border-color: var(--red);
+    color: var(--red);
+    background: rgba(255, 68, 85, 0.06);
+  }
+
+  .empty-state {
+    text-align: center;
+    padding: 5rem 2rem;
+    border: 1px dashed var(--border);
+    border-radius: 10px;
+    background: var(--bg-panel);
+  }
+  .empty-icon {
+    font-size: 48px;
+    margin-bottom: 1rem;
+    color: var(--border-md);
+    display: block;
+  }
+  .empty-title {
+    font-family: var(--cond);
+    font-size: 18px;
+    font-weight: 600;
+    letter-spacing: 1px;
+    margin-bottom: 0.5rem;
+  }
+  .empty-sub {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text-dim);
+    margin-bottom: 1.5rem;
+  }
+
+  .info-box {
+    background: rgba(0, 212, 255, 0.04);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--cyan);
+    border-radius: 0 6px 6px 0;
+    padding: 1rem 1.25rem;
+    margin-bottom: 1.5rem;
+    font-family: var(--mono);
+    font-size: 11px;
+  }
+  .ib-title {
+    color: var(--cyan);
+    font-size: 10px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    margin-bottom: 0.5rem;
+  }
+  .ib-body {
+    color: var(--text-sec);
+    line-height: 1.7;
+  }
+  .ib-code {
+    color: var(--cyan);
+    font-size: 12px;
+  }
+</style>
+{% endblock %} 
+
+{% block content %}
+<div style="max-width: 1100px">
+  <div style="display: flex; align-items: flex-end; justify-content: space-between; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 1rem;">
+    <div>
+      <div class="pg-eyebrow">Agent Management</div>
+      <div class="pg-title">Registered Agents</div>
+      <div class="pg-sub">
+        ENDPOINT AGENTS &nbsp;·&nbsp; {{ agents|length }} TOTAL REGISTERED
+      </div>
+    </div>
+    <a href="{% url 'scanner:agent_register' %}" class="btn btn-primary">
+      <i class="bi bi-plus-circle"></i> Register New Agent
+    </a>
+  </div>
+
+  <div class="info-box">
+    <div class="ib-title">
+      <i class="bi bi-info-circle"></i> &nbsp;What is an Agent?
+    </div>
+    <div class="ib-body">
+      An agent is a Python script (<span class="ib-code">agent.py</span>) that
+      runs on an endpoint inside the BARC lab network. It performs controlled
+      attacks (nmap scans, DGA queries, data exfiltration simulations) and
+      reports results back to this server. Each agent authenticates using a
+      unique token + HMAC signature on every request.
+    </div>
+  </div>
+
+  {% if agents %}
+  <div class="agent-grid">
+    {% for agent in agents %} 
+    {% with is_online=agent.is_online %}
+    <div class="agent-card {% if not agent.is_active %}inactive{% elif is_online %}online{% else %}offline{% endif %}">
+      <div class="ac-header">
+        <div class="ac-left">
+          <div class="ac-avatar">
+            <i class="bi bi-cpu"></i>
+          </div>
+          <div>
+            <div class="ac-id">{{ agent.agent_id }}</div>
+            <div class="ac-name">
+              {{ agent.name|default:"No display name" }}
+            </div>
+          </div>
+        </div>
+        <div class="ac-status">
+          {% if not agent.is_active %}
+          <span class="status-dot dot-inactive"></span>
+          <span class="st-inactive">DISABLED</span>
+          {% elif is_online %}
+          <span class="status-dot dot-online"></span>
+          <span class="st-online">ONLINE</span>
+          {% else %}
+          <span class="status-dot dot-offline"></span>
+          <span class="st-offline">OFFLINE</span>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="ac-divider"></div>
+
+      <div class="ac-stats">
+        <div class="ac-stat">
+          <div class="ac-stat-val">{{ agent.total_requests }}</div>
+          <div class="ac-stat-lbl">Requests</div>
+        </div>
+        <div class="ac-stat">
+          <div class="ac-stat-val">{{ agent.scan_count|default:"0" }}</div>
+          <div class="ac-stat-lbl">Scans Run</div>
+        </div>
+        <div class="ac-stat">
+          <div class="ac-stat-val" style="font-size: 12px">
+            {% if agent.last_seen_ip %}{{ agent.last_seen_ip }}{% else %}—{% endif %}
+          </div>
+          <div class="ac-stat-lbl">Last IP</div>
+        </div>
+      </div>
+
+      <div class="ac-footer">
+        <div class="ac-lastseen">
+          {% if agent.last_seen_at %}
+          <i class="bi bi-clock"></i> {{ agent.last_seen_at|timesince }} ago 
+          {% else %} 
+          <i class="bi bi-clock"></i> Never connected 
+          {% endif %}
+        </div>
+        <div class="ac-actions">
+          <a href="{% url 'scanner:agent_detail' agent.pk %}" class="ac-btn">
+            Details →
+          </a>
+          <form method="post" action="{% url 'scanner:agent_toggle' agent.pk %}" style="margin: 0">
+            {% csrf_token %}
+            {% if agent.is_active %}
+            <button type="submit" class="ac-btn danger">Disable</button>
+            {% else %}
+            <button type="submit" class="ac-btn">Enable</button>
+            {% endif %}
+          </form>
+        </div>
+      </div>
+    </div>
+    {% endwith %} 
+    {% endfor %}
+  </div>
+
+  {% else %}
+  <div class="empty-state">
+    <i class="bi bi-cpu empty-icon"></i>
+    <div class="empty-title">No Agents Registered</div>
+    <div class="empty-sub">
+      Register your first agent to start sending controlled attacks from the lab
+      endpoint.
+    </div>
+    <a href="{% url 'scanner:agent_register' %}" class="btn btn-primary">
+      <i class="bi bi-plus-circle"></i> Register First Agent
+    </a>
+  </div>
+  {% endif %}
+
+  <div class="section-title" style="margin: 2rem 0 1rem">Quick Start</div>
+  <div style="background: var(--bg-panel); border: 1px solid var(--border); border-radius: 8px; padding: 1.25rem;">
+    <div style="font-family: var(--mono); font-size: 11px; color: var(--text-sec); line-height: 2.2;">
+      <div style="margin-bottom: 0.5rem; font-size: 10px; letter-spacing: 1px; color: var(--text-dim); text-transform: uppercase;">
+        After registering — run these commands on your lab endpoint:
+      </div>
+      <div>
+        <span style="color: var(--text-dim)"># 1. Copy agent.py to your lab machine, then register:</span>
+      </div>
+      <div>
+        <span style="color: var(--cyan)">python agent.py</span>
+        <span style="color: var(--amber)">--register</span>
+        <span style="color: var(--text-sec)">--agent-id barc-lab-01 --reg-key YOUR_REGISTRATION_KEY</span>
+      </div>
+      <div style="margin-top: 0.25rem">
+        <span style="color: var(--text-dim)"># 2. Start the persistent agent:</span>
+      </div>
+      <div><span style="color: var(--cyan)">python agent.py</span></div>
+      <div style="margin-top: 0.25rem">
+        <span style="color: var(--text-dim)"># 3. Or run a single scan:</span>
+      </div>
+      <div>
+        <span style="color: var(--cyan)">python agent.py</span>
+        <span style="color: var(--amber)">--scan</span>
+        <span style="color: var(--text-sec)">192.168.1.1 --profile fast</span>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

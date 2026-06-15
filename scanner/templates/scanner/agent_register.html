@@ -1,0 +1,725 @@
+<!-- scanner/templates/scanner/agent_register.html -->
+{% extends "scanner/base.html" %} {% block title %}Register Agent{% endblock %}
+{% block extra_css %}
+<style>
+  .pg-eyebrow {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 2px;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    margin-bottom: 6px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .pg-eyebrow::before {
+    content: "";
+    width: 24px;
+    height: 1px;
+    background: var(--cyan-dim);
+  }
+  .pg-title {
+    font-family: var(--cond);
+    font-size: 28px;
+    font-weight: 700;
+    letter-spacing: 2px;
+  }
+  .pg-sub {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text-dim);
+    margin-top: 4px;
+    letter-spacing: 0.5px;
+  }
+
+  .reg-grid {
+    display: grid;
+    grid-template-columns: 1fr 340px;
+    gap: 1.5rem;
+    align-items: start;
+    max-width: 960px;
+  }
+  @media (max-width: 760px) {
+    .reg-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  .form-panel {
+    background: var(--bg-panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+  }
+  .fp-top {
+    background: var(--bg-raised);
+    border-bottom: 1px solid var(--border);
+    padding: 1rem 1.5rem;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .fp-icon {
+    width: 32px;
+    height: 32px;
+    border: 1px solid var(--border-md);
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--cyan);
+    font-size: 14px;
+  }
+  .fp-title {
+    font-family: var(--cond);
+    font-size: 14px;
+    font-weight: 600;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--text-sec);
+  }
+  .fp-body {
+    padding: 1.75rem;
+  }
+
+  .field-group {
+    margin-bottom: 1.5rem;
+  }
+  .field-lbl {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 8px;
+  }
+  .req {
+    color: var(--red);
+  }
+  .field-hint {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--text-dim);
+    margin-top: 6px;
+    line-height: 1.6;
+  }
+  .field-error {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--red);
+    margin-top: 5px;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+  }
+
+  .field-input,
+  .field-select {
+    width: 100%;
+    background: var(--bg-deep);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 11px 14px;
+    color: var(--text-pri);
+    font-family: var(--mono);
+    font-size: 13px;
+    outline: none;
+    transition:
+      border-color 0.2s,
+      box-shadow 0.2s;
+    -webkit-appearance: none;
+  }
+  .field-input:focus,
+  .field-select:focus {
+    border-color: var(--cyan);
+    box-shadow: 0 0 0 3px rgba(0, 212, 255, 0.1);
+  }
+  .field-input::placeholder {
+    color: var(--text-dim);
+  }
+
+  .char-count {
+    float: right;
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--text-dim);
+  }
+  .char-count.warn {
+    color: var(--amber);
+  }
+
+  .divider {
+    height: 1px;
+    background: var(--border);
+    margin: 1.75rem 0;
+  }
+
+  .btn-submit {
+    width: 100%;
+    padding: 14px;
+    font-family: var(--cond);
+    font-size: 15px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    background: var(--cyan);
+    color: var(--bg-deep);
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s;
+    box-shadow: 0 0 20px rgba(0, 212, 255, 0.2);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+  }
+  .btn-submit:hover {
+    background: #33ddff;
+    box-shadow: 0 0 32px rgba(0, 212, 255, 0.4);
+    transform: translateY(-1px);
+  }
+
+  .info-stack {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+  }
+  .info-card {
+    background: var(--bg-panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+  }
+  .ic-hd {
+    background: var(--bg-raised);
+    border-bottom: 1px solid var(--border);
+    padding: 0.75rem 1.25rem;
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .ic-hd i {
+    color: var(--cyan);
+    font-size: 12px;
+  }
+  .ic-body {
+    padding: 1rem 1.25rem;
+  }
+
+  .step-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+  .step {
+    display: grid;
+    grid-template-columns: 22px 1fr;
+    gap: 10px;
+    align-items: flex-start;
+  }
+  .step-num {
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    border: 1px solid var(--border-md);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--cyan);
+    flex-shrink: 0;
+    margin-top: 1px;
+  }
+  .step-text {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text-sec);
+    line-height: 1.6;
+  }
+  .step-code {
+    color: var(--cyan);
+  }
+
+  .warn-notice {
+    background: rgba(255, 170, 0, 0.04);
+    border: 1px solid rgba(255, 170, 0, 0.2);
+    border-left: 3px solid var(--amber);
+    border-radius: 0 6px 6px 0;
+    padding: 0.875rem 1rem;
+    display: flex;
+    gap: 10px;
+    align-items: flex-start;
+  }
+  .wn-ic {
+    color: var(--amber);
+    font-size: 13px;
+    flex-shrink: 0;
+    margin-top: 1px;
+  }
+  .wn-tx {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: #ccaa55;
+    line-height: 1.6;
+  }
+
+  /* Success state */
+  .cred-box {
+    background: var(--bg-deep);
+    border: 1px solid rgba(0, 255, 136, 0.3);
+    border-radius: 8px;
+    padding: 1.5rem;
+    margin-top: 1rem;
+  }
+  .cred-title {
+    font-family: var(--cond);
+    font-size: 14px;
+    font-weight: 600;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: var(--green);
+    margin-bottom: 1rem;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .cred-row {
+    margin-bottom: 0.875rem;
+  }
+  .cred-lbl {
+    font-family: var(--mono);
+    font-size: 9px;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    margin-bottom: 4px;
+  }
+  .cred-val {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--cyan);
+    background: var(--bg-panel);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 8px 10px;
+    word-break: break-all;
+    position: relative;
+    cursor: pointer;
+    transition: border-color 0.15s;
+  }
+  .cred-val:hover {
+    border-color: var(--cyan);
+  }
+  .copy-hint {
+    position: absolute;
+    right: 8px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 11px;
+    color: var(--text-dim);
+  }
+  .warn-once {
+    background: rgba(255, 68, 85, 0.08);
+    border: 1px solid rgba(255, 68, 85, 0.25);
+    border-radius: 4px;
+    padding: 0.75rem 1rem;
+    margin-top: 1rem;
+    font-family: var(--mono);
+    font-size: 11px;
+    color: #ff9999;
+    line-height: 1.6;
+  }
+</style>
+{% endblock %} {% block content %}
+<div style="max-width: 960px">
+  <div
+    style="
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-between;
+      margin-bottom: 1.5rem;
+      flex-wrap: wrap;
+      gap: 1rem;
+    "
+  >
+    <div>
+      <div class="pg-eyebrow">Agent Management</div>
+      <div class="pg-title">Register New Agent</div>
+      <div class="pg-sub">
+        CREATE AGENT IDENTITY &nbsp;·&nbsp; GENERATE CREDENTIALS
+      </div>
+    </div>
+    <a href="{% url 'scanner:agent_list' %}" class="btn btn-outline">
+      <i class="bi bi-arrow-left"></i> Back to Agents
+    </a>
+  </div>
+
+  {% if new_agent %}
+  <!-- ── SUCCESS STATE — show credentials ─────────────────────────────── -->
+  <div class="cred-box">
+    <div class="cred-title">
+      <i class="bi bi-check-circle-fill"></i>
+      Agent Registered Successfully
+    </div>
+
+    <div class="cred-row">
+      <div class="cred-lbl">Agent ID</div>
+      <div class="cred-val" onclick="copyVal(this)">
+        {{ new_agent.agent_id }}
+        <span class="copy-hint"><i class="bi bi-clipboard"></i></span>
+      </div>
+    </div>
+
+    <div class="cred-row">
+      <div class="cred-lbl">Auth Token — paste into Authorization header</div>
+      <div class="cred-val" onclick="copyVal(this)">
+        {{ new_agent.auth_token }}
+        <span class="copy-hint"><i class="bi bi-clipboard"></i></span>
+      </div>
+    </div>
+
+    <div class="cred-row">
+      <div class="cred-lbl">Secret Key — used for HMAC signing</div>
+      <div class="cred-val" onclick="copyVal(this)">
+        {{ new_agent.secret_key }}
+        <span class="copy-hint"><i class="bi bi-clipboard"></i></span>
+      </div>
+    </div>
+
+    <div class="warn-once">
+      <i class="bi bi-exclamation-triangle-fill"></i>
+      <strong>Save these credentials NOW.</strong>
+      The secret key is shown only once and is not stored in plaintext. Paste
+      both values into <code>agent_config.json</code> on your lab machine.
+    </div>
+
+    <div
+      style="
+        margin-top: 1.25rem;
+        background: var(--bg-panel);
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        padding: 1rem;
+      "
+    >
+      <div
+        style="
+          font-family: var(--mono);
+          font-size: 10px;
+          letter-spacing: 1px;
+          color: var(--text-dim);
+          text-transform: uppercase;
+          margin-bottom: 0.75rem;
+        "
+      >
+        agent_config.json — save this file on your lab endpoint
+      </div>
+      <pre
+        id="config-json"
+        style="
+          font-family: var(--mono);
+          font-size: 12px;
+          color: var(--cyan);
+          margin: 0;
+          white-space: pre-wrap;
+          cursor: pointer;
+        "
+        onclick="copyJson()"
+      >
+{
+  "server_url":  "http://127.0.0.1:8000",
+  "agent_id":    "{{ new_agent.agent_id }}",
+  "auth_token":  "{{ new_agent.auth_token }}",
+  "secret_key":  "{{ new_agent.secret_key }}"
+}</pre
+      >
+      <div
+        style="
+          margin-top: 0.5rem;
+          font-family: var(--mono);
+          font-size: 10px;
+          color: var(--text-dim);
+        "
+      >
+        Click to copy &nbsp;·&nbsp;
+        <a href="{% url 'scanner:agent_list' %}" style="color: var(--cyan)"
+          >View all agents →</a
+        >
+      </div>
+    </div>
+  </div>
+
+  {% else %}
+  <!-- ── REGISTRATION FORM ─────────────────────────────────────────────── -->
+  <div class="reg-grid">
+    <div class="form-panel">
+      <div class="fp-top">
+        <div class="fp-icon"><i class="bi bi-cpu"></i></div>
+        <div class="fp-title">Agent Identity</div>
+      </div>
+      <div class="fp-body">
+        <form method="post" id="reg-form">
+          {% csrf_token %}
+
+          <!-- Agent ID -->
+          <div class="field-group">
+            <label class="field-lbl">
+              Agent ID <span class="req">*</span>
+            </label>
+            <input
+              type="text"
+              name="agent_id"
+              id="agent-id-inp"
+              class="field-input"
+              placeholder="barc-lab-endpoint-01"
+              value="{{ form.agent_id.value|default:'' }}"
+              maxlength="64"
+              oninput="updateId(this.value)"
+              autocomplete="off"
+              spellcheck="false"
+            />
+            {% if form.agent_id.errors %}
+            <div class="field-error">
+              <i class="bi bi-exclamation-circle"></i>{{ form.agent_id.errors.0
+              }}
+            </div>
+            {% endif %}
+            <div class="field-hint">
+              Unique identifier for this agent. Use lowercase letters, numbers
+              and hyphens only. Example:
+              <span style="color: var(--cyan)">barc-lab-01</span>
+            </div>
+          </div>
+
+          <!-- Display name -->
+          <div class="field-group">
+            <label class="field-lbl">Display Name</label>
+            <input
+              type="text"
+              name="name"
+              class="field-input"
+              placeholder="BARC Lab Endpoint — Room 3"
+              value="{{ form.name.value|default:'' }}"
+              maxlength="128"
+              autocomplete="off"
+            />
+            <div class="field-hint">
+              Human-readable label shown in the dashboard. Optional.
+            </div>
+          </div>
+
+          <!-- Registration key -->
+          <div class="field-group">
+            <label class="field-lbl">
+              Registration Key <span class="req">*</span>
+            </label>
+            <input
+              type="password"
+              name="registration_key"
+              class="field-input"
+              placeholder="Your AGENT_REGISTRATION_KEY from settings.py"
+              autocomplete="off"
+            />
+            {% if form.registration_key.errors %}
+            <div class="field-error">
+              <i class="bi bi-exclamation-circle"></i>{{
+              form.registration_key.errors.0 }}
+            </div>
+            {% endif %}
+            <div class="field-hint">
+              Set in <span style="color: var(--cyan)">settings.py</span> as
+              <span style="color: var(--cyan)"
+                >AGENT_REGISTRATION_KEY = "..."</span
+              >
+            </div>
+          </div>
+
+          <div class="divider"></div>
+
+          <!-- Command preview -->
+          <div
+            style="
+              background: var(--bg-deep);
+              border: 1px solid var(--border);
+              border-radius: 6px;
+              padding: 11px 14px;
+              margin-bottom: 1.75rem;
+            "
+          >
+            <div
+              style="
+                font-family: var(--mono);
+                font-size: 10px;
+                letter-spacing: 1px;
+                color: var(--text-dim);
+                text-transform: uppercase;
+                margin-bottom: 8px;
+              "
+            >
+              After registration — run on your endpoint:
+            </div>
+            <div
+              id="cmd-preview"
+              style="
+                font-family: var(--mono);
+                font-size: 12px;
+                color: var(--cyan);
+                word-break: break-all;
+              "
+            >
+              python agent.py --register --agent-id
+              <span id="cmd-id" style="color: var(--amber)"
+                >&lt;agent-id&gt;</span
+              >
+              --reg-key YOUR_KEY
+            </div>
+          </div>
+
+          {% if error_message %}
+          <div
+            style="
+              background: rgba(255, 68, 85, 0.08);
+              border: 1px solid rgba(255, 68, 85, 0.25);
+              border-left: 3px solid var(--red);
+              border-radius: 0 6px 6px 0;
+              padding: 10px 14px;
+              font-family: var(--mono);
+              font-size: 11px;
+              color: #ff9999;
+              margin-bottom: 1.5rem;
+            "
+          >
+            <i class="bi bi-exclamation-triangle"></i> {{ error_message }}
+          </div>
+          {% endif %}
+
+          <button type="submit" class="btn-submit">
+            <i class="bi bi-shield-check"></i>
+            Register Agent
+          </button>
+        </form>
+      </div>
+    </div>
+
+    <!-- Right info panel -->
+    <div class="info-stack">
+      <div class="info-card">
+        <div class="ic-hd"><i class="bi bi-list-ol"></i> What happens next</div>
+        <div class="ic-body">
+          <div class="step-list">
+            <div class="step">
+              <div class="step-num">1</div>
+              <div class="step-text">
+                Server generates a unique
+                <span class="step-code">auth_token</span> and
+                <span class="step-code">secret_key</span> for this agent.
+              </div>
+            </div>
+            <div class="step">
+              <div class="step-num">2</div>
+              <div class="step-text">
+                You copy both into
+                <span class="step-code">agent_config.json</span>
+                on your lab endpoint machine.
+              </div>
+            </div>
+            <div class="step">
+              <div class="step-num">3</div>
+              <div class="step-text">
+                Run <span class="step-code">python agent.py</span> on the
+                endpoint. It connects to this server and starts sending
+                heartbeats.
+              </div>
+            </div>
+            <div class="step">
+              <div class="step-num">4</div>
+              <div class="step-text">
+                Every request from the agent is signed with an HMAC signature.
+                The server verifies it before accepting any data.
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="info-card">
+        <div class="ic-hd">
+          <i class="bi bi-shield-lock"></i> Security model
+        </div>
+        <div
+          class="ic-body"
+          style="
+            font-family: var(--mono);
+            font-size: 11px;
+            color: var(--text-sec);
+            line-height: 1.8;
+          "
+        >
+          Every request carries three security layers:
+          <br /><br />
+          <span style="color: var(--cyan)"
+            >Authorization: Bearer &lt;token&gt;</span
+          ><br />
+          → Identifies which agent is calling
+          <br /><br />
+          <span style="color: var(--cyan)">X-Timestamp: &lt;unix time&gt;</span
+          ><br />
+          → Prevents replay attacks (5 min window)
+          <br /><br />
+          <span style="color: var(--cyan)"
+            >X-Signature: &lt;HMAC-SHA256&gt;</span
+          ><br />
+          → Proves the body was not tampered with
+        </div>
+      </div>
+
+      <div class="warn-notice">
+        <span class="wn-ic"
+          ><i class="bi bi-exclamation-triangle-fill"></i
+        ></span>
+        <div class="wn-tx">
+          The <strong>secret_key</strong> is shown exactly once after
+          registration. It is not stored in plaintext on the server. If lost,
+          you must delete and re-register the agent.
+        </div>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+</div>
+{% endblock %} {% block extra_js %}
+<script>
+  function updateId(val) {
+    const clean = val.trim() || "<agent-id>";
+    document.getElementById("cmd-id").textContent = clean;
+  }
+
+  function copyVal(el) {
+    const text = el.textContent.replace(/[\n\t]+/g, "").trim();
+    navigator.clipboard.writeText(text).then(() => {
+      el.style.borderColor = "var(--green)";
+      setTimeout(() => (el.style.borderColor = ""), 1500);
+    });
+  }
+
+  function copyJson() {
+    const text = document.getElementById("config-json").textContent;
+    navigator.clipboard.writeText(text).then(() => {
+      const el = document.getElementById("config-json");
+      el.style.color = "var(--green)";
+      setTimeout(() => (el.style.color = "var(--cyan)"), 1500);
+    });
+  }
+</script>
+{% endblock %}

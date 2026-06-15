@@ -1,0 +1,305 @@
+<!-- scanner/templates/scanner/scan_report.html -->
+{% extends "scanner/base.html" %}
+{% block title %}Report — {{ source_scan.target }}{% endblock %}
+
+{% block extra_css %}
+<style>
+.report-header {
+  display: flex; align-items: flex-start;
+  justify-content: space-between; margin-bottom: 1.5rem;
+  gap: 1rem; flex-wrap: wrap;
+}
+
+.report-title {
+  font-family: var(--cond); font-size: 22px; font-weight: 700;
+  letter-spacing: 1px; color: var(--text-pri);
+  display: flex; align-items: center; gap: 10px;
+}
+
+.report-target {
+  font-family: var(--mono); color: var(--cyan);
+  font-size: 18px; letter-spacing: 1px;
+}
+
+.report-meta {
+  font-family: var(--mono); font-size: 10px; color: var(--text-dim);
+  letter-spacing: 1px; margin-top: 6px; line-height: 2;
+}
+
+.meta-sep { color: var(--border-md); margin: 0 8px; }
+
+.report-actions { display: flex; gap: .5rem; flex-shrink: 0; }
+
+/* Alert banner */
+.alert-banner {
+  border: 1px solid rgba(255,68,85,.3);
+  border-left: 3px solid var(--red);
+  border-radius: 8px; overflow: hidden;
+  margin-bottom: 1.5rem;
+  background: rgba(255,68,85,.03);
+}
+
+.alert-banner-header {
+  padding: .75rem 1.25rem;
+  background: rgba(255,68,85,.06);
+  border-bottom: 1px solid rgba(255,68,85,.15);
+  font-family: var(--mono); font-size: 11px; letter-spacing: 1px;
+  color: var(--red); text-transform: uppercase;
+  display: flex; align-items: center; gap: 8px;
+}
+
+.alert-item {
+  display: flex; align-items: center; gap: 12px;
+  padding: .75rem 1.25rem;
+  border-bottom: 1px solid rgba(255,68,85,.08);
+  font-size: 13px;
+}
+
+.alert-item:last-child { border-bottom: none; }
+
+.alert-port {
+  font-family: var(--mono); font-size: 11px;
+  background: rgba(255,68,85,.15); color: var(--red);
+  padding: 3px 8px; border-radius: 3px; flex-shrink: 0;
+}
+
+.alert-ip {
+  font-family: var(--mono); font-size: 12px; color: var(--amber); flex-shrink: 0;
+}
+
+.alert-text { font-size: 12px; color: var(--text-sec); }
+
+/* Host card */
+.host-card {
+  border: 1px solid var(--border); border-radius: 8px;
+  overflow: hidden; margin-bottom: 1rem;
+  transition: border-color .2s;
+}
+
+.host-card:hover { border-color: var(--border-md); }
+
+.host-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: .875rem 1.25rem;
+  background: var(--bg-raised); flex-wrap: wrap; gap: .5rem;
+}
+
+.host-identity { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+
+.host-ip {
+  font-family: var(--mono); font-size: 15px; color: var(--cyan);
+  font-weight: 400;
+}
+
+.host-name {
+  font-family: var(--mono); font-size: 11px; color: var(--text-dim);
+}
+
+.host-os {
+  font-family: var(--mono); font-size: 11px; color: var(--text-dim);
+  display: flex; align-items: center; gap: 5px;
+}
+
+.host-risk-badge {
+  font-family: var(--cond); font-size: 13px; font-weight: 700;
+  letter-spacing: 1.5px;
+}
+
+.port-table-wrap { overflow-x: auto; }
+
+.port-critical { background: rgba(255,68,85,.04); }
+
+.port-num {
+  font-family: var(--mono); font-size: 13px; font-weight: 600;
+  color: var(--text-pri);
+}
+
+.service-name { font-family: var(--mono); font-size: 12px; color: var(--cyan-dim); }
+
+.version-text { font-family: var(--mono); font-size: 11px; color: var(--text-dim); }
+
+.risk-note { font-size: 12px; color: var(--text-sec); }
+
+.no-ports {
+  padding: 1rem 1.25rem;
+  font-family: var(--mono); font-size: 11px; color: var(--text-dim);
+}
+
+.empty-hosts {
+  padding: 4rem; text-align: center;
+  font-family: var(--mono); font-size: 12px; color: var(--text-dim);
+}
+</style>
+{% endblock %}
+
+{% block content %}
+
+<div class="report-header">
+  <div>
+    <div class="report-title">
+      <i class="bi bi-file-earmark-bar-graph" style="color:var(--cyan)"></i>
+      Scan Report
+    </div>
+    <div class="report-target">{{ source_scan.target }}</div>
+    <div class="report-meta">
+      <span>PROFILE: {{ source_scan.get_scan_profile_display|upper }}</span>
+      <span class="meta-sep">·</span>
+      <span>COMPLETED: {{ source_scan.completed_at|date:"Y-m-d H:i" }}</span>
+      <span class="meta-sep">·</span>
+      <span>DURATION: {{ source_scan.duration_seconds }}s</span>
+      <span class="meta-sep">·</span>
+      <span>SCAN #{{ source_scan.pk }}</span>
+      {% if scan.cache_hit %}
+        <span class="meta-sep">·</span>
+        <span style="color:var(--amber)">
+          <i class="bi bi-lightning-fill"></i> CACHED RESULT
+        </span>
+      {% endif %}
+    </div>
+  </div>
+  <div class="report-actions">
+    <a href="{% url 'scanner:dashboard' %}" class="btn btn-outline">
+      <i class="bi bi-arrow-left"></i> Back
+    </a>
+    <a href="{% url 'scanner:submit_scan' %}" class="btn btn-primary">
+      <i class="bi bi-arrow-repeat"></i> Rescan
+    </a>
+  </div>
+</div>
+
+<!-- Summary -->
+<div class="stat-grid" style="margin-bottom:1.5rem">
+  <div class="stat-card {% if source_scan.overall_risk == 'HIGH' %}danger{% elif source_scan.overall_risk == 'MEDIUM' %}warning{% endif %}">
+    <div class="stat-label">Overall Risk</div>
+    <div class="stat-value risk-{{ source_scan.overall_risk }}">{{ source_scan.overall_risk }}</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">Hosts Alive</div>
+    <div class="stat-value">{{ source_scan.hosts_up }}<span style="font-size:14px;color:var(--text-dim)"> / {{ source_scan.total_hosts }}</span></div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">Open Ports</div>
+    <div class="stat-value">{{ source_scan.total_open_ports }}</div>
+  </div>
+  <div class="stat-card danger">
+    <div class="stat-label">High Severity</div>
+    <div class="stat-value risk-HIGH">{{ source_scan.high_severity_count }}</div>
+  </div>
+  <div class="stat-card warning">
+    <div class="stat-label">Medium Severity</div>
+    <div class="stat-value risk-MEDIUM">{{ source_scan.medium_severity_count }}</div>
+  </div>
+  <div class="stat-card danger">
+    <div class="stat-label">Critical Alerts</div>
+    <div class="stat-value" style="color:var(--red)">{{ critical_alerts|length }}</div>
+  </div>
+</div>
+
+<!-- Critical alerts -->
+{% if critical_alerts %}
+<div class="alert-banner">
+  <div class="alert-banner-header">
+    <i class="bi bi-exclamation-triangle-fill"></i>
+    Critical Alerts — Immediate Action Required ({{ critical_alerts|length }})
+  </div>
+  {% for port in critical_alerts %}
+  <div class="alert-item">
+    <span class="alert-port">{{ port.port }}/{{ port.protocol }}</span>
+    <span class="alert-ip">{{ port.host.ip_address }}</span>
+    <span class="alert-text">{{ port.alert_message }}</span>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+
+<!-- Host findings -->
+<div class="section-header">
+  <div class="section-title">Host Findings</div>
+  <div style="font-family:var(--mono);font-size:10px;color:var(--text-dim)">
+    {{ hosts|length }} HOST{{ hosts|length|pluralize:"S" }} SCANNED
+  </div>
+</div>
+
+{% for host in hosts %}
+<div class="host-card">
+  <div class="host-header">
+    <div class="host-identity">
+      <span class="host-ip">{{ host.ip_address }}</span>
+      {% if host.hostname %}
+        <span class="host-name">({{ host.hostname }})</span>
+      {% endif %}
+      <span class="status-badge status-{{ host.status }}">{{ host.status }}</span>
+      {% if host.os_detected != 'N/A' and host.os_detected %}
+        <span class="host-os">
+          <i class="bi bi-cpu"></i> {{ host.os_detected }}
+          {% if host.os_accuracy %}
+            <span style="color:var(--border-md)">({{ host.os_accuracy }}%)</span>
+          {% endif %}
+        </span>
+      {% endif %}
+    </div>
+    <div style="display:flex;align-items:center;gap:12px">
+      <span style="font-family:var(--mono);font-size:10px;color:var(--text-dim)">
+        {{ host.open_port_count }} OPEN PORT{{ host.open_port_count|pluralize }}
+      </span>
+      <span class="host-risk-badge risk-{{ host.host_risk }}">{{ host.host_risk }}</span>
+    </div>
+  </div>
+
+  {% with open_ports=host.ports.all %}
+  {% if open_ports %}
+  <div class="port-table-wrap">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Port</th>
+          <th>Protocol</th>
+          <th>State</th>
+          <th>Service</th>
+          <th>Version</th>
+          <th>Severity</th>
+          <th>Risk Note</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for port in open_ports %}
+        <tr class="{% if port.is_critical_alert %}port-critical{% endif %}">
+          <td>
+            <span class="port-num">{{ port.port }}</span>
+            {% if port.is_critical_alert %}
+              <i class="bi bi-exclamation-triangle-fill"
+                 style="color:var(--red);font-size:10px;margin-left:4px"></i>
+            {% endif %}
+          </td>
+          <td class="mono" style="font-size:11px;color:var(--text-dim)">{{ port.protocol }}</td>
+          <td>
+            {% if port.state == 'open' %}
+              <span class="sev sev-INFO" style="background:rgba(0,255,136,.08);color:#55ffaa;border-color:rgba(0,255,136,.2)">open</span>
+            {% else %}
+              <span class="sev sev-NONE">{{ port.state }}</span>
+            {% endif %}
+          </td>
+          <td class="service-name">{{ port.service_name }}</td>
+          <td class="version-text">{{ port.full_version }}</td>
+          <td><span class="sev sev-{{ port.severity }}">{{ port.severity }}</span></td>
+          <td class="risk-note">{{ port.risk_note }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="no-ports">— No open ports detected on this host</div>
+  {% endif %}
+  {% endwith %}
+</div>
+{% empty %}
+<div class="card">
+  <div class="empty-hosts">
+    <i class="bi bi-search" style="font-size:32px;display:block;margin-bottom:.75rem;color:var(--border-md)"></i>
+    No host data found in scan results
+  </div>
+</div>
+{% endfor %}
+
+{% endblock %}

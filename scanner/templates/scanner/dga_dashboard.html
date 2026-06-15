@@ -1,0 +1,139 @@
+<!-- scanner/templates/scanner/dga_dashboard.html -->
+{% extends "scanner/base.html" %}
+{% block title %}DGA Results{% endblock %}
+
+{% block extra_css %}
+.pg-eyebrow{font-family:var(--mono);font-size:10px;letter-spacing:2px;color:var(--text-dim);text-transform:uppercase;margin-bottom:6px;display:flex;align-items:center;gap:8px}
+.pg-eyebrow::before{content:'';width:24px;height:1px;background:var(--cyan-dim)}
+.pg-title{font-family:var(--cond);font-size:28px;font-weight:700;letter-spacing:2px}
+.pg-sub{font-family:var(--mono);font-size:11px;color:var(--text-dim);margin-top:4px}
+.ids-detected{color:var(--red);font-family:var(--mono);font-size:11px;font-weight:600}
+.ids-evaded{color:var(--green);font-family:var(--mono);font-size:11px;font-weight:600}
+.ids-unknown{color:var(--text-dim);font-family:var(--mono);font-size:11px}
+.ratio-bar{height:4px;background:var(--border);border-radius:2px;overflow:hidden;margin-top:4px}
+.ratio-fill{height:100%;background:var(--red);border-radius:2px}
+.algo-badge{font-family:var(--mono);font-size:9px;letter-spacing:.5px;padding:2px 7px;border-radius:3px;border:1px solid var(--border);color:var(--text-dim)}
+.algo-date{border-color:rgba(0,212,255,.3);color:var(--cyan)}
+.algo-xor{border-color:rgba(255,170,0,.3);color:var(--amber)}
+.algo-word{border-color:rgba(0,255,136,.3);color:var(--green)}
+{% endblock %}
+
+{% block content %}
+<div style="max-width:1100px">
+
+  <div style="display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:1.5rem;flex-wrap:wrap;gap:1rem">
+    <div>
+      <div class="pg-eyebrow">IDS Evaluation</div>
+      <div class="pg-title">DGA Test Results</div>
+      <div class="pg-sub">DOMAIN GENERATION ALGORITHM &nbsp;·&nbsp; {{ total_runs }} TOTAL RUNS</div>
+    </div>
+  </div>
+
+  <!-- Stat cards -->
+  <div class="stat-grid" style="margin-bottom:1.5rem">
+    <div class="stat-card">
+      <div class="stat-label">Total Runs</div>
+      <div class="stat-value">{{ total_runs }}</div>
+    </div>
+    <div class="stat-card danger">
+      <div class="stat-label">IDS Detected</div>
+      <div class="stat-value risk-HIGH">{{ detected_runs }}</div>
+    </div>
+    <div class="stat-card success">
+      <div class="stat-label">IDS Evaded</div>
+      <div class="stat-value" style="color:var(--green)">{{ evaded_runs }}</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Pending Review</div>
+      <div class="stat-value" style="color:var(--amber)">{{ unknown_runs }}</div>
+    </div>
+    <div class="stat-card danger">
+      <div class="stat-label">High Risk Runs</div>
+      <div class="stat-value risk-HIGH">{{ high_risk_count }}</div>
+    </div>
+  </div>
+
+  <!-- Results table -->
+  <div class="section-title" style="margin-bottom:1rem">All DGA Runs</div>
+  <div class="card">
+    {% if results %}
+    <div style="overflow-x:auto">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Algorithm</th>
+            <th>Queries</th>
+            <th>NXDOMAIN</th>
+            <th>NXDOMAIN Ratio</th>
+            <th>Avg Entropy</th>
+            <th>Rate/s</th>
+            <th>Duration</th>
+            <th>IDS Status</th>
+            <th>Risk</th>
+            <th>When</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for r in results %}
+          <tr>
+            <td class="mono" style="font-size:11px;color:var(--text-dim)">{{ r.pk }}</td>
+            <td>
+              {% if r.algorithm == 'date_seed' %}
+                <span class="algo-badge algo-date">DATE-SEED</span>
+              {% elif r.algorithm == 'xor_lcg' %}
+                <span class="algo-badge algo-xor">XOR-LCG</span>
+              {% else %}
+                <span class="algo-badge algo-word">WORDLIST</span>
+              {% endif %}
+            </td>
+            <td class="mono" style="font-size:12px">{{ r.total_queries }}</td>
+            <td class="mono" style="font-size:12px;color:var(--red)">{{ r.nxdomain_count }}</td>
+            <td>
+              <div class="mono" style="font-size:11px">{{ r.nxdomain_ratio|floatformat:2 }}</div>
+              <div class="ratio-bar">
+                <div class="ratio-fill" style="width:{{ r.nxdomain_ratio|floatformat:0 }}00%"></div>
+              </div>
+            </td>
+            <td class="mono" style="font-size:12px">{{ r.avg_entropy }}</td>
+            <td class="mono" style="font-size:11px;color:var(--text-dim)">{{ r.rate_per_sec }}</td>
+            <td class="mono" style="font-size:11px;color:var(--text-dim)">{{ r.duration_sec|floatformat:1 }}s</td>
+            <td>
+              {% if r.ids_detected is None %}
+                <span class="ids-unknown">Unknown</span>
+              {% elif r.ids_detected %}
+                <span class="ids-detected">⚠ Detected</span>
+              {% else %}
+                <span class="ids-evaded">✓ Evaded</span>
+              {% endif %}
+            </td>
+            <td>
+              <span class="risk-{{ r.risk_level }}" style="font-family:var(--mono);font-size:11px;font-weight:600">
+                {{ r.risk_level }}
+              </span>
+            </td>
+            <td class="mono" style="font-size:10px;color:var(--text-dim)">{{ r.created_at|timesince }} ago</td>
+            <td>
+              <a href="{% url 'scanner:dga_detail' r.pk %}"
+                 style="font-family:var(--mono);font-size:10px;color:var(--cyan-dim)">
+                Detail →
+              </a>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div style="text-align:center;padding:5rem 2rem;color:var(--text-dim)">
+      <i class="bi bi-diagram-3" style="font-size:40px;display:block;margin-bottom:1rem;color:var(--border-md)"></i>
+      <div style="font-family:var(--mono);font-size:12px">No DGA runs yet.</div>
+      <div style="font-family:var(--mono);font-size:11px;margin-top:.5rem;color:var(--text-dim)">
+        Start the agent and run: <code>python agent.py --dga --algorithm date_seed</code>
+      </div>
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

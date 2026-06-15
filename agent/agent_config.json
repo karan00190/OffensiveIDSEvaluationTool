@@ -1,0 +1,7 @@
+{
+  "server_url": "http://127.0.0.1:8000",
+  "agent_id": "102",
+  "auth_token": "031a82300721c33295506c48b65c39a3fcd95ecea352e60039506a36ce2a7088",
+  "secret_key": "4d2fa5519fc9d69f60f6558b8529339abdf9dd77757c4d033d7e46bdb81762ff",
+  "registration_key": "change-this-to-something-strong"
+}

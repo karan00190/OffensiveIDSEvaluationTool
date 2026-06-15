@@ -1,0 +1,989 @@
+<!-- scanner/templates/scanner/module_control.html -->
+{% extends "scanner/base.html" %}
+{% block title %}Module Control{% endblock %}
+
+{% block extra_css %}
+<style>
+
+/* ── Page layout ─────────────────────────────────────────────────────────── */
+.mc-grid {
+  display: grid;
+  grid-template-columns: 400px 1fr;
+  gap: 1.5rem;
+  align-items: start;
+  margin-bottom: 2rem;
+}
+@media (max-width: 960px) { .mc-grid { grid-template-columns: 1fr; } }
+
+/* ── Page header (matches dga_dashboard / exfil_dashboard) ──────────────── */
+.pg-eyebrow {
+  font-family: var(--mono); font-size: 10px; letter-spacing: 2px;
+  color: var(--text-dim); text-transform: uppercase;
+  margin-bottom: 6px; display: flex; align-items: center; gap: 8px;
+}
+.pg-eyebrow::before { content: ''; width: 24px; height: 1px; background: var(--cyan-dim); }
+.pg-title  { font-family: var(--cond); font-size: 28px; font-weight: 700; letter-spacing: 2px; }
+.pg-sub    { font-family: var(--mono); font-size: 11px; color: var(--text-dim); margin-top: 4px; }
+
+/* ── Agent selector card ─────────────────────────────────────────────────── */
+.agent-bar {
+  background: var(--bg-panel); border: 1px solid var(--border);
+  border-radius: 8px; padding: 1rem 1.25rem;
+  margin-bottom: 1.5rem;
+  display: flex; align-items: center; gap: 1rem; flex-wrap: wrap;
+}
+.agent-bar-label {
+  font-family: var(--mono); font-size: 10px; letter-spacing: 1.5px;
+  text-transform: uppercase; color: var(--text-dim); flex-shrink: 0;
+}
+.agent-select {
+  flex: 1; min-width: 220px; max-width: 400px;
+  background: var(--bg-deep); border: 1px solid var(--border);
+  border-radius: 6px; padding: 9px 14px;
+  color: var(--text-pri); font-family: var(--mono); font-size: 12px;
+  outline: none; transition: border-color .2s;
+  -webkit-appearance: none;
+}
+.agent-select:focus { border-color: var(--cyan); }
+.agent-online-dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: var(--text-dim); flex-shrink: 0;
+  transition: background .3s, box-shadow .3s;
+}
+.agent-online-txt {
+  font-family: var(--mono); font-size: 11px;
+  color: var(--text-dim); transition: color .3s;
+}
+
+/* ── Module tabs ─────────────────────────────────────────────────────────── */
+.mc-tab-bar { display: flex; gap: 4px; margin-bottom: -1px; position: relative; z-index: 1; }
+
+.mc-tab {
+  font-family: var(--cond); font-size: 13px; font-weight: 600;
+  letter-spacing: 1px; text-transform: uppercase;
+  padding: 9px 20px; border-radius: 6px 6px 0 0;
+  border: 1px solid var(--border); border-bottom: none;
+  background: var(--bg-panel); color: var(--text-sec);
+  cursor: pointer; transition: all .2s;
+  display: flex; align-items: center; gap: 7px;
+}
+.mc-tab:hover { color: var(--cyan); }
+.mc-tab.active {
+  color: var(--cyan); background: var(--bg-raised);
+  border-color: var(--border-md);
+}
+
+/* ── Form panels ─────────────────────────────────────────────────────────── */
+.mc-panel {
+  display: none;
+  border: 1px solid var(--border-md);
+  border-radius: 0 8px 8px 8px;
+  background: var(--bg-raised);
+  overflow: hidden;
+}
+.mc-panel.active { display: block; }
+.mc-panel-body   { padding: 1.5rem; }
+
+/* ── Form elements ───────────────────────────────────────────────────────── */
+.fl           { margin-bottom: 1.25rem; }
+.fl:last-child { margin-bottom: 0; }
+
+.fl-label {
+  font-family: var(--mono); font-size: 10px; letter-spacing: 1.5px;
+  text-transform: uppercase; color: var(--text-dim);
+  display: flex; align-items: center; gap: 6px; margin-bottom: 7px;
+}
+.req { color: var(--red); }
+.opt { font-size: 9px; color: var(--text-dim); text-transform: none; letter-spacing: .3px; }
+
+.fl-input, .fl-select {
+  width: 100%; background: var(--bg-deep);
+  border: 1px solid var(--border); border-radius: 6px;
+  padding: 10px 14px; color: var(--text-pri);
+  font-family: var(--mono); font-size: 12px; outline: none;
+  transition: border-color .2s, box-shadow .2s; -webkit-appearance: none;
+}
+.fl-input:focus, .fl-select:focus {
+  border-color: var(--cyan);
+  box-shadow: 0 0 0 3px rgba(0,212,255,.09);
+}
+.fl-input::placeholder { color: var(--text-dim); }
+.fl-hint {
+  font-family: var(--mono); font-size: 10px;
+  color: var(--text-dim); margin-top: 5px; line-height: 1.5;
+}
+.fl-two { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+
+.form-err {
+  font-family: var(--mono); font-size: 11px;
+  color: #ff8899;
+  background: rgba(255,68,85,.06); border: 1px solid rgba(255,68,85,.2);
+  border-left: 3px solid var(--red);
+  border-radius: 0 4px 4px 0;
+  padding: 8px 12px; display: none; margin-bottom: 1rem;
+}
+
+/* ── Choice cards  (technique / profile) ─────────────────────────────────── */
+.choice-grid { display: grid; gap: 8px; }
+
+.choice-card {
+  background: var(--bg-deep); border: 1px solid var(--border);
+  border-radius: 6px; padding: 12px 8px; cursor: pointer;
+  transition: all .2s; text-align: center;
+  position: relative; overflow: hidden; -webkit-user-select: none; user-select: none;
+}
+.choice-card::before {
+  content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px;
+  background: var(--cc, var(--border)); transition: box-shadow .2s;
+}
+.choice-card:hover          { border-color: var(--border-md); background: var(--bg-raised); }
+.choice-card.c-sel          { border-color: var(--cc, var(--cyan)); background: var(--bg-raised); }
+.choice-card.c-sel::before  { box-shadow: 0 0 10px var(--cc, var(--cyan)); }
+
+.ci { font-size: 17px; color: var(--text-dim); display: block; margin-bottom: 5px; transition: color .2s; }
+.choice-card.c-sel .ci     { color: var(--cc, var(--cyan)); }
+
+.cn {
+  font-family: var(--cond); font-size: 11px; font-weight: 700;
+  letter-spacing: .8px; text-transform: uppercase; color: var(--text-sec);
+}
+.choice-card.c-sel .cn { color: var(--text-pri); }
+
+.cs { font-family: var(--mono); font-size: 9px; color: var(--text-dim); margin-top: 2px; }
+
+/* ── Advanced toggle ─────────────────────────────────────────────────────── */
+.adv-toggle {
+  font-family: var(--mono); font-size: 11px; color: var(--cyan-dim);
+  cursor: pointer; display: flex; align-items: center; gap: 6px;
+  padding: 8px 0; border-top: 1px solid var(--border);
+  margin: .25rem 0 1rem; transition: color .15s;
+}
+.adv-toggle:hover { color: var(--cyan); }
+
+/* ── Launch button ───────────────────────────────────────────────────────── */
+.launch-btn {
+  width: 100%; padding: 12px;
+  font-family: var(--cond); font-size: 14px; font-weight: 700;
+  letter-spacing: 2px; text-transform: uppercase;
+  background: var(--cyan); color: var(--bg-void);
+  border: none; border-radius: 6px; cursor: pointer;
+  transition: all .2s; box-shadow: 0 0 16px rgba(0,212,255,.2);
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  margin-top: 1.5rem;
+}
+.launch-btn:hover:not(:disabled) {
+  background: #33ddff; box-shadow: 0 0 28px rgba(0,212,255,.4);
+  transform: translateY(-1px);
+}
+.launch-btn:disabled {
+  background: var(--text-dim); box-shadow: none;
+  cursor: not-allowed; transform: none;
+}
+
+/* ── Live terminal ───────────────────────────────────────────────────────── */
+.terminal-box {
+  height: 310px; overflow-y: auto;
+  padding: 1rem; font-family: var(--mono); font-size: 11px;
+  background: var(--bg-deep); line-height: 1.8;
+  border-top: 1px solid var(--border);
+}
+.t-line  { display: flex; gap: 8px; word-break: break-all; }
+.t-ts    { color: var(--text-dim); flex-shrink: 0; letter-spacing: .3px; }
+.t-txt   { flex: 1; }
+.t-normal  { color: var(--text-sec); }
+.t-success { color: var(--green); }
+.t-error   { color: var(--red); }
+.t-warn    { color: var(--amber); }
+.t-dim     { color: var(--text-dim); }
+.t-cyan    { color: var(--cyan); }
+
+/* ── Status card KV rows ─────────────────────────────────────────────────── */
+.sc-kv {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 7px 0; border-bottom: 1px solid rgba(0,212,255,.05);
+}
+.sc-kv:last-of-type { border-bottom: none; }
+.sc-k { font-family: var(--mono); font-size: 10px; letter-spacing: .5px; color: var(--text-dim); text-transform: uppercase; }
+.sc-v { font-family: var(--mono); font-size: 12px; color: var(--text-pri); }
+
+/* ── Result box ──────────────────────────────────────────────────────────── */
+.result-box {
+  margin-top: 1rem; padding: 1rem;
+  background: rgba(0,255,136,.05); border: 1px solid rgba(0,255,136,.25);
+  border-radius: 6px; display: none; align-items: center; gap: 10px;
+}
+
+/* ── Empty state ─────────────────────────────────────────────────────────── */
+.empty-state {
+  text-align: center; padding: 5rem 2rem;
+  font-family: var(--mono); font-size: 12px; color: var(--text-dim);
+}
+.empty-state i { font-size: 40px; display: block; margin-bottom: 1rem; color: var(--border-md); }
+
+</style>
+{% endblock %}
+
+
+{% block content %}
+<div style="max-width:1200px">
+
+  <!-- ── Page header ───────────────────────────────────────────────────── -->
+  <div style="display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:1.5rem;flex-wrap:wrap;gap:1rem">
+    <div>
+      <div class="pg-eyebrow">Orchestration</div>
+      <div class="pg-title">Module Control</div>
+      <div class="pg-sub">DGA SIMULATION &nbsp;·&nbsp; DATA EXFILTRATION &nbsp;·&nbsp; REAL-TIME DISPATCH</div>
+    </div>
+    <div style="display:flex;gap:.5rem">
+      <a href="{% url 'scanner:dga_dashboard' %}" class="btn btn-outline">
+        <i class="bi bi-diagram-3"></i> DGA History
+      </a>
+      <a href="{% url 'scanner:exfil_dashboard' %}" class="btn btn-outline">
+        <i class="bi bi-arrow-up-right-circle"></i> Exfil History
+      </a>
+    </div>
+  </div>
+
+  {% if not agents %}
+  <!-- ── No agents state ─────────────────────────────────────────────── -->
+  <div class="card">
+    <div class="empty-state">
+      <i class="bi bi-cpu"></i>
+      <div style="margin-bottom:.5rem">No active agents registered.</div>
+      <div style="color:var(--text-dim);margin-bottom:1.5rem">
+        Register and connect an agent endpoint before dispatching modules.
+      </div>
+      <a href="{% url 'scanner:agent_register' %}" class="btn btn-primary">
+        <i class="bi bi-plus-circle"></i> Register Agent
+      </a>
+    </div>
+  </div>
+
+  {% else %}
+
+  <!-- ── Agent selector ──────────────────────────────────────────────── -->
+  <div class="agent-bar">
+    <span class="agent-bar-label">Target Agent</span>
+    <select id="agent-select" class="agent-select" onchange="onAgentChange()">
+      <option value="">— Select agent —</option>
+      {% for agent in agents %}
+      <option value="{{ agent.agent_id }}"
+              data-online="{{ agent.is_online|yesno:'true,false' }}">
+        {{ agent.agent_id }}{% if agent.name and agent.name != agent.agent_id %} ({{ agent.name }}){% endif %}{% if not agent.is_online %} — OFFLINE{% endif %}
+      </option>
+      {% endfor %}
+    </select>
+    <span id="a-dot" class="agent-online-dot"></span>
+    <span id="a-txt" class="agent-online-txt">No agent selected</span>
+  </div>
+
+  <!-- ── Main grid ───────────────────────────────────────────────────── -->
+  <div class="mc-grid">
+
+    <!-- LEFT COLUMN: config forms -->
+    <div>
+      <!-- Tab bar -->
+      <div class="mc-tab-bar">
+        <button class="mc-tab active" data-tab="dga" onclick="switchTab('dga')">
+          <i class="bi bi-diagram-3"></i> DGA Simulation
+        </button>
+        <button class="mc-tab" data-tab="exfil" onclick="switchTab('exfil')">
+          <i class="bi bi-arrow-up-right-circle"></i> Data Exfil
+        </button>
+      </div>
+
+      <!-- ── DGA Panel ─────────────────────────────────────────────── -->
+      <div id="panel-dga" class="mc-panel active">
+        <div class="card-header" style="border-bottom:1px solid var(--border)">
+          <div class="card-title"><i class="bi bi-diagram-3"></i> DGA Configuration</div>
+        </div>
+        <div class="mc-panel-body">
+
+          <!-- Algorithm -->
+          <div class="fl">
+            <label class="fl-label">Algorithm <span class="req">*</span></label>
+            <select id="dga-algo" class="fl-select" onchange="onAlgoChange()">
+              <option value="date_seed">Date-Seeded SHA-256</option>
+              <option value="xor_lcg">XOR + LCG (Conficker-style)</option>
+              <option value="wordlist">Wordlist Combination</option>
+            </select>
+            <div id="dga-algo-hint" class="fl-hint">
+              SHA-256(date + secret) → high-entropy random domains. Changes daily.
+            </div>
+          </div>
+
+          <!-- DNS server -->
+          <div class="fl">
+            <label class="fl-label">
+              DNS Server&nbsp;<span class="opt">optional</span>
+            </label>
+            <input id="dga-dns" class="fl-input" type="text"
+                   placeholder="Leave blank for system resolver (e.g. 192.168.1.1)"/>
+          </div>
+
+          <!-- Count + Rate side by side -->
+          <div class="fl-two">
+            <div class="fl">
+              <label class="fl-label">Domain Count <span class="req">*</span></label>
+              <input id="dga-count" class="fl-input" type="number"
+                     value="50" min="1" max="500"/>
+              <div class="fl-hint">1 – 500 domains</div>
+            </div>
+            <div class="fl">
+              <label class="fl-label">Rate (q/s) <span class="req">*</span></label>
+              <input id="dga-rate" class="fl-input" type="number"
+                     value="1.0" min="0.1" max="10" step="0.1"/>
+              <div class="fl-hint">0.1 – 10.0 queries/sec</div>
+            </div>
+          </div>
+
+          <div id="dga-err" class="form-err"></div>
+
+          <button id="dga-btn" class="launch-btn" onclick="launchDga()">
+            <i class="bi bi-play-fill"></i> Launch DGA
+          </button>
+        </div>
+      </div><!-- /panel-dga -->
+
+      <!-- ── Exfil Panel ────────────────────────────────────────────── -->
+      <div id="panel-exfil" class="mc-panel">
+        <div class="card-header" style="border-bottom:1px solid var(--border)">
+          <div class="card-title"><i class="bi bi-arrow-up-right-circle"></i> Exfil Configuration</div>
+        </div>
+        <div class="mc-panel-body">
+
+          <!-- Technique cards -->
+          <div class="fl">
+            <label class="fl-label">Technique <span class="req">*</span></label>
+            <div class="choice-grid" style="grid-template-columns:repeat(3,1fr)">
+              <div class="choice-card c-sel" data-group="technique" data-value="dns" style="--cc:var(--cyan)" onclick="pickChoice(this)">
+                <i class="bi bi-diagram-3 ci"></i>
+                <div class="cn">DNS Tunnel</div>
+                <div class="cs">Base32 subdomains</div>
+              </div>
+              <div class="choice-card" data-group="technique" data-value="http" style="--cc:var(--amber)" onclick="pickChoice(this)">
+                <i class="bi bi-globe ci"></i>
+                <div class="cn">HTTP Inject</div>
+                <div class="cs">Header injection</div>
+              </div>
+              <div class="choice-card" data-group="technique" data-value="icmp" style="--cc:var(--red)" onclick="pickChoice(this)">
+                <i class="bi bi-broadcast ci"></i>
+                <div class="cn">ICMP Stuff</div>
+                <div class="cs">Payload padding</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Profile cards -->
+          <div class="fl">
+            <label class="fl-label">Behavioral Profile <span class="req">*</span></label>
+            <div class="choice-grid" style="grid-template-columns:repeat(3,1fr)">
+              <div class="choice-card c-sel" data-group="profile" data-value="burst" style="--cc:var(--green)" onclick="pickChoice(this);updateAdv()">
+                <i class="bi bi-lightning-fill ci"></i>
+                <div class="cn">Burst</div>
+                <div class="cs">Max speed</div>
+              </div>
+              <div class="choice-card" data-group="profile" data-value="slow_drip" style="--cc:var(--cyan)" onclick="pickChoice(this);updateAdv()">
+                <i class="bi bi-droplet ci"></i>
+                <div class="cn">Slow Drip</div>
+                <div class="cs">Fixed interval</div>
+              </div>
+              <div class="choice-card" data-group="profile" data-value="jitter" style="--cc:var(--amber)" onclick="pickChoice(this);updateAdv()">
+                <i class="bi bi-shuffle ci"></i>
+                <div class="cn">Jitter</div>
+                <div class="cs">Random delay</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Target + Payload -->
+          <div class="fl-two">
+            <div class="fl">
+              <label class="fl-label">Target <span class="req">*</span></label>
+              <input id="exfil-target" class="fl-input" type="text" placeholder="192.168.1.1"/>
+            </div>
+            <div class="fl">
+              <label class="fl-label">Payload Type</label>
+              <select id="exfil-payload" class="fl-select">
+                <option value="credentials">Credentials</option>
+                <option value="pii">PII Data</option>
+                <option value="api_key">API Key</option>
+                <option value="db_dump">DB Dump</option>
+                <option value="config">Config File</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Advanced toggle -->
+          <div class="adv-toggle" onclick="toggleAdv()">
+            <i class="bi bi-chevron-right" id="adv-chevron"></i>
+            Advanced Options
+          </div>
+
+          <div id="adv-panel" style="display:none">
+            <div class="fl">
+              <label class="fl-label">DNS Domain</label>
+              <input id="exfil-dnsdomain" class="fl-input" type="text" value="exfil-test.local"/>
+              <div class="fl-hint">Parent domain for DNS tunnelling subdomains</div>
+            </div>
+            <div id="drip-row" style="display:none" class="fl">
+              <label class="fl-label">Drip Interval (s)</label>
+              <input id="exfil-drip" class="fl-input" type="number" value="10" min="1" max="300"/>
+              <div class="fl-hint">Seconds between chunks — slow_drip profile</div>
+            </div>
+            <div id="jitter-row" style="display:none">
+              <div class="fl-two">
+                <div class="fl">
+                  <label class="fl-label">Jitter Min (s)</label>
+                  <input id="exfil-jmin" class="fl-input" type="number" value="1.0" min="0.1" max="60" step="0.1"/>
+                </div>
+                <div class="fl">
+                  <label class="fl-label">Jitter Max (s)</label>
+                  <input id="exfil-jmax" class="fl-input" type="number" value="8.0" min="0.2" max="120" step="0.1"/>
+                </div>
+              </div>
+            </div>
+          </div><!-- /adv-panel -->
+
+          <div id="exfil-err" class="form-err"></div>
+
+          <button id="exfil-btn" class="launch-btn" onclick="launchExfil()">
+            <i class="bi bi-play-fill"></i> Launch Exfil
+          </button>
+        </div>
+      </div><!-- /panel-exfil -->
+    </div><!-- /left column -->
+
+    <!-- RIGHT COLUMN: terminal + status -->
+    <div>
+
+      <!-- Live terminal -->
+      <div class="card" style="margin-bottom:1rem">
+        <div class="card-header">
+          <div class="card-title">
+            <i class="bi bi-terminal"></i>
+            Live Output — <span id="terminal-module" style="color:var(--cyan-dim)">IDLE</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:.75rem">
+            <span id="ws-dot" style="width:7px;height:7px;border-radius:50%;background:var(--text-dim);display:inline-block;transition:all .3s"></span>
+            <button onclick="clearTerminal()" class="btn btn-outline" style="padding:3px 10px;font-size:10px">
+              <i class="bi bi-trash"></i> Clear
+            </button>
+          </div>
+        </div>
+        <div id="terminal" class="terminal-box">
+          <div class="t-line">
+            <span class="t-ts">——:——:——</span>
+            <span class="t-txt t-dim">Waiting for dispatch…</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Task status card -->
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title"><i class="bi bi-activity"></i> Task Status</div>
+        </div>
+        <div style="padding:1.25rem">
+
+          <!-- Status indicator -->
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:1.25rem">
+            <span id="sc-dot" style="width:11px;height:11px;border-radius:50%;background:var(--text-dim);flex-shrink:0;transition:all .3s"></span>
+            <span id="sc-status" style="font-family:var(--mono);font-size:13px;font-weight:600;color:var(--text-dim);letter-spacing:1px">
+              IDLE
+            </span>
+          </div>
+
+          <!-- KV rows -->
+          <div class="sc-kv">
+            <span class="sc-k">Task ID</span>
+            <span id="sc-task" class="sc-v" style="color:var(--cyan)">—</span>
+          </div>
+          <div class="sc-kv">
+            <span class="sc-k">Module</span>
+            <span id="sc-module" class="sc-v">—</span>
+          </div>
+          <div class="sc-kv">
+            <span class="sc-k">Agent</span>
+            <span id="sc-agent" class="sc-v">—</span>
+          </div>
+          <div class="sc-kv">
+            <span class="sc-k">Duration</span>
+            <span id="sc-duration" class="sc-v">—</span>
+          </div>
+
+          <!-- Error message -->
+          <div id="sc-error" style="display:none;font-family:var(--mono);font-size:11px;color:var(--red);background:rgba(255,68,85,.06);border:1px solid rgba(255,68,85,.2);border-radius:4px;padding:8px 10px;margin-top:.75rem"></div>
+
+          <!-- Result link -->
+          <div id="result-box" class="result-box">
+            <i class="bi bi-check-circle-fill" style="color:var(--green);font-size:18px;flex-shrink:0"></i>
+            <a id="result-link" href="#" class="btn btn-primary" style="flex:1;justify-content:center">
+              View Result →
+            </a>
+          </div>
+
+        </div>
+      </div><!-- /status card -->
+
+    </div><!-- /right column -->
+  </div><!-- /mc-grid -->
+
+  <!-- ── Recent tasks ─────────────────────────────────────────────────── -->
+  <div class="section-header">
+    <div class="section-title">Recent Tasks</div>
+    <span style="font-family:var(--mono);font-size:10px;color:var(--text-dim)">
+      {{ recent_tasks|length }} RECORD{{ recent_tasks|length|pluralize:"S" }}
+    </span>
+  </div>
+
+  <div class="card">
+    {% if recent_tasks %}
+    <div style="overflow-x:auto">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Task ID</th>
+            <th>Module</th>
+            <th>Agent</th>
+            <th>Status</th>
+            <th>Dispatched</th>
+            <th>Duration</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for task in recent_tasks %}
+          <tr>
+            <td class="mono" style="font-size:11px;color:var(--cyan);letter-spacing:.5px">
+              {{ task.task_id_short }}
+            </td>
+            <td>
+              {% if task.module == 'dga' %}
+                <span class="sev sev-INFO">DGA</span>
+              {% elif task.module == 'exfil' %}
+                <span class="sev sev-MEDIUM">EXFIL</span>
+              {% else %}
+                <span class="sev sev-NONE">{{ task.module|upper }}</span>
+              {% endif %}
+            </td>
+            <td class="mono" style="font-size:11px;color:var(--text-sec)">
+              {{ task.agent.agent_id }}
+            </td>
+            <td>
+              {% if task.status == 'complete' %}
+                <span class="status-badge status-complete">complete</span>
+              {% elif task.status == 'running' %}
+                <span class="status-badge status-running">running</span>
+              {% elif task.status == 'dispatched' %}
+                <span class="status-badge status-running">dispatched</span>
+              {% elif task.status == 'failed' %}
+                <span class="status-badge status-failed">failed</span>
+              {% else %}
+                <span class="status-badge status-pending">{{ task.status }}</span>
+              {% endif %}
+            </td>
+            <td class="mono" style="font-size:10px;color:var(--text-dim)">
+              {{ task.dispatched_at|timesince }} ago
+            </td>
+            <td class="mono" style="font-size:10px;color:var(--text-dim)">
+              {% if task.duration_seconds %}{{ task.duration_seconds }}s{% else %}—{% endif %}
+            </td>
+            <td>
+              {% if task.result_pk and task.status == 'complete' %}
+                {% if task.module == 'dga' %}
+                  <a href="{% url 'scanner:dga_detail' task.result_pk %}"
+                     style="font-family:var(--mono);font-size:10px;color:var(--cyan-dim)">
+                    Result →
+                  </a>
+                {% elif task.module == 'exfil' %}
+                  <a href="{% url 'scanner:exfil_detail' task.result_pk %}"
+                     style="font-family:var(--mono);font-size:10px;color:var(--cyan-dim)">
+                    Result →
+                  </a>
+                {% endif %}
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div class="empty-state" style="padding:3rem 2rem">
+      <i class="bi bi-terminal" style="font-size:32px"></i>
+      No tasks dispatched yet. Launch a DGA or Exfil task above.
+    </div>
+    {% endif %}
+  </div>
+
+  {% endif %}{# end if agents #}
+</div><!-- /max-width wrapper -->
+{% endblock %}
+
+
+{% block extra_js %}
+<script>
+'use strict';
+
+/* ── State ─────────────────────────────────────────────────────────────── */
+let curModule = 'dga';
+let curTaskId = null;
+let pollTimer = null;
+let wsConn    = null;
+let advOpen   = false;
+
+const ALGO_HINTS = {
+  date_seed: 'SHA-256(date + secret) → high-entropy domains that rotate daily.',
+  xor_lcg:   'Linear Congruential Generator — simulates Conficker worm DGA style.',
+  wordlist:   'Wordlist combinations → lower entropy, harder for heuristic IDS to flag.',
+};
+
+const STATUS_COLORS = {
+  dispatching: 'var(--cyan)',
+  dispatched:  'var(--cyan)',
+  running:     'var(--amber)',
+  complete:    'var(--green)',
+  failed:      'var(--red)',
+};
+
+/* ── Boot ──────────────────────────────────────────────────────────────── */
+document.addEventListener('DOMContentLoaded', () => {
+  connectWS();
+  updateAdv();
+});
+
+/* ── WebSocket ─────────────────────────────────────────────────────────── */
+function connectWS() {
+  const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+  wsConn = new WebSocket(`${proto}//${location.host}/ws/dashboard/`);
+
+  wsConn.addEventListener('open', () => {
+    setWsDot(true);
+    appendLine('● WebSocket live — streaming active', 'dim');
+  });
+
+  wsConn.addEventListener('message', e => {
+    let d;
+    try { d = JSON.parse(e.data); } catch { return; }
+
+    /* Live plugin output — filter to active module only */
+    if (d.type === 'live_update') {
+      if (d.module === curModule || !d.module) {
+        const txt = (d.output || d.message || '').trim();
+        if (txt) appendLine(txt, lvlToStyle(d.level));
+      }
+    }
+    /* Task complete push — compare against our current task_id */
+    else if (d.type === 'task_complete' && d.task_id === curTaskId) {
+      stopPoll();
+      appendLine(`✓ Complete — result #${d.result_pk} ready`, 'success');
+      showResult(d.result_url, d.task_id_short);
+      setCard({ status: 'complete', is_terminal: true });
+    }
+  });
+
+  wsConn.addEventListener('close', () => {
+    setWsDot(false);
+    appendLine('○ WebSocket closed — reconnecting in 3 s…', 'dim');
+    setTimeout(connectWS, 3000);
+  });
+
+  wsConn.addEventListener('error', () => setWsDot(false));
+}
+
+function setWsDot(online) {
+  const dot = document.getElementById('ws-dot');
+  if (!dot) return;
+  dot.style.background = online ? 'var(--green)' : 'var(--red)';
+  dot.style.boxShadow  = online ? '0 0 6px var(--green)' : 'none';
+}
+
+/* ── Tabs ──────────────────────────────────────────────────────────────── */
+function switchTab(tab) {
+  curModule = tab;
+  document.querySelectorAll('.mc-tab').forEach(b =>
+    b.classList.toggle('active', b.dataset.tab === tab));
+  document.querySelectorAll('.mc-panel').forEach(p =>
+    p.classList.toggle('active', p.id === `panel-${tab}`));
+  setTxt('terminal-module', tab.toUpperCase());
+}
+
+/* ── Choice cards ──────────────────────────────────────────────────────── */
+function pickChoice(card) {
+  const grp = card.dataset.group;
+  document.querySelectorAll(`.choice-card[data-group="${grp}"]`)
+          .forEach(c => c.classList.remove('c-sel'));
+  card.classList.add('c-sel');
+}
+
+/* ── Agent selector ────────────────────────────────────────────────────── */
+function onAgentChange() {
+  const sel    = document.getElementById('agent-select');
+  const opt    = sel.options[sel.selectedIndex];
+  const online = opt && opt.dataset.online === 'true';
+  const dot    = document.getElementById('a-dot');
+  const txt    = document.getElementById('a-txt');
+  if (!opt || !opt.value) {
+    dot.style.background = 'var(--text-dim)';
+    dot.style.boxShadow  = 'none';
+    txt.textContent      = 'No agent selected';
+    txt.style.color      = 'var(--text-dim)';
+    return;
+  }
+  dot.style.background = online ? 'var(--green)' : 'var(--amber)';
+  dot.style.boxShadow  = online ? '0 0 6px var(--green)' : 'none';
+  txt.textContent      = online ? 'Online' : 'Offline — command will queue on reconnect';
+  txt.style.color      = online ? 'var(--green)' : 'var(--amber)';
+}
+
+/* ── Terminal output ───────────────────────────────────────────────────── */
+const MAX_LINES = 300;
+
+function appendLine(txt, style) {
+  const box = document.getElementById('terminal');
+  const ts  = new Date().toTimeString().slice(0, 8);
+  const el  = document.createElement('div');
+  el.className = 't-line';
+  el.innerHTML = `<span class="t-ts">[${ts}]</span><span class="t-txt t-${style || 'normal'}">${esc(txt)}</span>`;
+  box.appendChild(el);
+  box.scrollTop = box.scrollHeight;
+  while (box.children.length > MAX_LINES) box.removeChild(box.firstChild);
+}
+
+function clearTerminal() {
+  document.getElementById('terminal').innerHTML = '';
+}
+
+function esc(s) {
+  return String(s)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function lvlToStyle(lvl) {
+  return lvl === 'error' ? 'error' : lvl === 'warning' ? 'warn' : 'normal';
+}
+
+/* ── CSRF helper ───────────────────────────────────────────────────────── */
+function csrf() {
+  const m = document.cookie.match(/(?:^|;\s*)csrftoken=([^;]*)/);
+  return m ? decodeURIComponent(m[1]) : '';
+}
+
+/* ── DGA launch ────────────────────────────────────────────────────────── */
+async function launchDga() {
+  clearErr('dga');
+  const agentId = document.getElementById('agent-select').value;
+  if (!agentId) { showErr('dga', 'Select a target agent first.'); return; }
+
+  const algo  = document.getElementById('dga-algo').value;
+  const cnt   = parseInt(document.getElementById('dga-count').value, 10);
+  const rate  = parseFloat(document.getElementById('dga-rate').value);
+  const dns   = document.getElementById('dga-dns').value.trim() || null;
+
+  if (!algo)                                { showErr('dga', 'Select an algorithm.'); return; }
+  if (isNaN(cnt) || cnt < 1 || cnt > 500)  { showErr('dga', 'Domain count must be 1 – 500.'); return; }
+  if (isNaN(rate) || rate < 0.1 || rate > 10) { showErr('dga', 'Query rate must be 0.1 – 10.0 /s.'); return; }
+
+  await doDispatch('dga', '/api/modules/dga/dispatch/', {
+    agent_id: agentId, algo_type: algo,
+    domain_count: cnt, query_rate: rate, dns_server: dns,
+  });
+}
+
+/* ── Exfil launch ──────────────────────────────────────────────────────── */
+async function launchExfil() {
+  clearErr('exfil');
+  const agentId = document.getElementById('agent-select').value;
+  if (!agentId) { showErr('exfil', 'Select a target agent first.'); return; }
+
+  const techCard = document.querySelector('.choice-card[data-group="technique"].c-sel');
+  const profCard = document.querySelector('.choice-card[data-group="profile"].c-sel');
+  const target   = document.getElementById('exfil-target').value.trim();
+
+  if (!techCard) { showErr('exfil', 'Select an exfil technique.'); return; }
+  if (!profCard) { showErr('exfil', 'Select a behavioral profile.'); return; }
+  if (!target)   { showErr('exfil', 'Target IP or hostname is required.'); return; }
+
+  const profile = profCard.dataset.value;
+  const drip    = parseFloat(document.getElementById('exfil-drip').value);
+  const jMin    = parseFloat(document.getElementById('exfil-jmin').value);
+  const jMax    = parseFloat(document.getElementById('exfil-jmax').value);
+
+  if (profile === 'slow_drip' && (isNaN(drip) || drip < 1 || drip > 300))
+      { showErr('exfil', 'Drip interval: 1 – 300 seconds.'); return; }
+  if (profile === 'jitter' && (isNaN(jMin) || isNaN(jMax) || jMin >= jMax || jMax > 120))
+      { showErr('exfil', 'Jitter: min < max, and max ≤ 120 s.'); return; }
+
+  await doDispatch('exfil', '/api/modules/exfil/dispatch/', {
+    agent_id:      agentId,
+    technique:     techCard.dataset.value,
+    profile:       profile,
+    target:        target,
+    payload_type:  document.getElementById('exfil-payload').value,
+    dns_domain:    document.getElementById('exfil-dnsdomain').value.trim() || 'exfil-test.local',
+    drip_interval: drip,
+    jitter_min:    jMin,
+    jitter_max:    jMax,
+  });
+}
+
+/* ── Common dispatch ───────────────────────────────────────────────────── */
+async function doDispatch(module, url, body) {
+  switchTab(module);
+  curTaskId = null;
+  stopPoll();
+  clearTerminal();
+  hideResult();
+  setBusy(module, true);
+  setCard({ status: 'dispatching', module });
+  appendLine(`Dispatching ${module.toUpperCase()} to agent ${body.agent_id}…`, 'dim');
+
+  let resp, data;
+  try {
+    resp = await fetch(url, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrf() },
+      body:    JSON.stringify(body),
+    });
+    data = await resp.json();
+  } catch (err) {
+    appendLine(`✗ Network error: ${err.message}`, 'error');
+    setCard({ status: 'failed', error_message: err.message });
+    setBusy(module, false);
+    return;
+  }
+
+  setBusy(module, false);
+
+  if (!resp.ok) {
+    const msg = data.error || `HTTP ${resp.status}`;
+    appendLine(`✗ Dispatch failed: ${msg}`, 'error');
+    showErr(module, msg);
+    setCard({ status: 'failed', error_message: msg });
+    return;
+  }
+
+  curTaskId = data.task_id;
+
+  if (data.warning) appendLine(`⚠  ${data.warning}`, 'warn');
+  appendLine(`Task ${data.task_id_short} dispatched → ${data.agent_id}`, 'success');
+  appendLine(`Agent online: ${data.agent_online}  |  Poll URL: ${data.poll_url}`, 'dim');
+
+  setCard({ ...data, status: data.status || 'dispatched', module });
+  startPoll(data.task_id, data.poll_url);
+}
+
+/* ── Status polling ────────────────────────────────────────────────────── */
+function startPoll(taskId, pollUrl) {
+  pollTimer = setInterval(async () => {
+    let d;
+    try { d = await (await fetch(pollUrl)).json(); }
+    catch { return; }
+
+    setCard(d);
+
+    if (d.is_terminal) {
+      stopPoll();
+      if (d.has_result && d.result_url) {
+        appendLine(`✓ ${d.module_display || curModule.toUpperCase()} complete — result #${d.result_pk}`, 'success');
+        showResult(d.result_url, d.task_id_short);
+      } else if (d.status === 'failed') {
+        appendLine(`✗ Task failed: ${d.error_message || 'unknown error'}`, 'error');
+      }
+    }
+  }, 2000);
+}
+
+function stopPoll() {
+  if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
+}
+
+/* ── Status card ───────────────────────────────────────────────────────── */
+function setCard(d) {
+  const s     = d.status || 'idle';
+  const color = STATUS_COLORS[s] || 'var(--text-dim)';
+  const dot   = document.getElementById('sc-dot');
+
+  dot.style.background = color;
+  dot.style.boxShadow  = s === 'running' ? `0 0 8px ${color}` : 'none';
+
+  setTxtStyle('sc-status', (d.status_display || s).toUpperCase(), 'color', color);
+  setTxt('sc-module',   (d.module || curModule || '—').toUpperCase());
+  setTxt('sc-agent',    d.agent_id || '—');
+  setTxt('sc-task',     d.task_id_short || (curTaskId ? curTaskId.slice(0,8).toUpperCase() : '—'));
+  setTxt('sc-duration', d.duration_seconds ? `${d.duration_seconds}s` : '—');
+
+  const errEl = document.getElementById('sc-error');
+  if (errEl) {
+    errEl.textContent  = d.error_message || '';
+    errEl.style.display = d.error_message ? 'block' : 'none';
+  }
+}
+
+/* ── Result link ───────────────────────────────────────────────────────── */
+function showResult(url, short) {
+  const link = document.getElementById('result-link');
+  const box  = document.getElementById('result-box');
+  if (link) { link.href = url; link.textContent = `View Result ${short || ''} →`; }
+  if (box)  box.style.display = 'flex';
+}
+
+function hideResult() {
+  const box = document.getElementById('result-box');
+  if (box) box.style.display = 'none';
+}
+
+/* ── Advanced options ──────────────────────────────────────────────────── */
+function toggleAdv() {
+  advOpen = !advOpen;
+  document.getElementById('adv-panel').style.display   = advOpen ? '' : 'none';
+  document.getElementById('adv-chevron').className     =
+    advOpen ? 'bi bi-chevron-down' : 'bi bi-chevron-right';
+}
+
+function updateAdv() {
+  const card = document.querySelector('.choice-card[data-group="profile"].c-sel');
+  const p    = card ? card.dataset.value : '';
+  document.getElementById('drip-row').style.display   = p === 'slow_drip' ? '' : 'none';
+  document.getElementById('jitter-row').style.display = p === 'jitter'    ? '' : 'none';
+}
+
+/* ── DGA algorithm hint ────────────────────────────────────────────────── */
+function onAlgoChange() {
+  const sel  = document.getElementById('dga-algo');
+  const hint = document.getElementById('dga-algo-hint');
+  if (hint && sel) hint.textContent = ALGO_HINTS[sel.value] || '';
+}
+
+/* ── Form helpers ──────────────────────────────────────────────────────── */
+function showErr(mod, msg) {
+  const el = document.getElementById(`${mod}-err`);
+  if (el) { el.textContent = msg; el.style.display = 'block'; }
+}
+function clearErr(mod) {
+  const el = document.getElementById(`${mod}-err`);
+  if (el) { el.textContent = ''; el.style.display = 'none'; }
+}
+function setBusy(mod, busy) {
+  const btn = document.getElementById(`${mod}-btn`);
+  if (!btn) return;
+  btn.disabled  = busy;
+  btn.innerHTML = busy
+    ? '<i class="bi bi-hourglass-split"></i> Dispatching…'
+    : `<i class="bi bi-play-fill"></i> Launch ${mod.toUpperCase()}`;
+}
+
+/* ── DOM helpers ───────────────────────────────────────────────────────── */
+function setTxt(id, val) {
+  const el = document.getElementById(id);
+  if (el) el.textContent = val;
+}
+function setTxtStyle(id, val, prop, propVal) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.textContent  = val;
+  el.style[prop]  = propVal;
+}
+</script>
+{% endblock %}

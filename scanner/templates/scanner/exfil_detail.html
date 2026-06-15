@@ -1,0 +1,539 @@
+<!-- scanner/templates/scanner/exfil_detail.html -->
+{% extends "scanner/base.html" %} 
+{% block title %}Exfil Run #{{ result.pk }}{% endblock %} 
+{% block extra_css %}
+<style>
+  .pg-title {
+    font-family: var(--cond);
+    font-size: 24px;
+    font-weight: 700;
+    letter-spacing: 2px;
+  }
+  .tech-dns {
+    border-color: rgba(0, 212, 255, 0.3);
+    color: var(--cyan);
+    background: rgba(0, 212, 255, 0.06);
+  }
+  .tech-http {
+    border-color: rgba(255, 170, 0, 0.3);
+    color: var(--amber);
+    background: rgba(255, 170, 0, 0.06);
+  }
+  .tech-icmp {
+    border-color: rgba(255, 68, 85, 0.3);
+    color: var(--red);
+    background: rgba(255, 68, 85, 0.06);
+  }
+  .tech-badge {
+    font-family: var(--mono);
+    font-size: 10px;
+    padding: 3px 10px;
+    border-radius: 3px;
+    border: 1px solid;
+  }
+  .kv-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 7px 0;
+    border-bottom: 1px solid rgba(0, 212, 255, 0.05);
+  }
+  .kv-row:last-child {
+    border-bottom: none;
+  }
+  .kv-k {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.5px;
+    color: var(--text-dim);
+    text-transform: uppercase;
+  }
+  .kv-v {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--text-pri);
+  }
+  .sig-item {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text-sec);
+    padding: 4px 0;
+    display: flex;
+    gap: 8px;
+    align-items: flex-start;
+  }
+  .sig-dot {
+    color: var(--cyan);
+    flex-shrink: 0;
+  }
+  .mark-form {
+    background: var(--bg-panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 1.25rem;
+  }
+  .mark-title {
+    font-family: var(--cond);
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: var(--text-sec);
+    margin-bottom: 1rem;
+  }
+  .btn-detected {
+    font-family: var(--cond);
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    padding: 8px 16px;
+    border-radius: 4px;
+    border: 1px solid rgba(255, 68, 85, 0.4);
+    color: var(--red);
+    background: rgba(255, 68, 85, 0.08);
+    cursor: pointer;
+    transition: all 0.2s;
+    width: 100%;
+    margin-bottom: 0.5rem;
+  }
+  .btn-detected:hover {
+    background: rgba(255, 68, 85, 0.15);
+    border-color: var(--red);
+  }
+  .btn-evaded {
+    font-family: var(--cond);
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    padding: 8px 16px;
+    border-radius: 4px;
+    border: 1px solid rgba(0, 255, 136, 0.4);
+    color: var(--green);
+    background: rgba(0, 255, 136, 0.06);
+    cursor: pointer;
+    transition: all 0.2s;
+    width: 100%;
+  }
+  .btn-evaded:hover {
+    background: rgba(0, 255, 136, 0.12);
+    border-color: var(--green);
+  }
+  .notes-input {
+    width: 100%;
+    background: var(--bg-deep);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 10px 12px;
+    color: var(--text-pri);
+    font-family: var(--mono);
+    font-size: 12px;
+    outline: none;
+    transition: border-color 0.2s;
+    resize: vertical;
+    min-height: 70px;
+    margin-bottom: 0.75rem;
+  }
+  .notes-input:focus {
+    border-color: var(--cyan);
+  }
+  .detection-banner {
+    border-radius: 8px;
+    padding: 1rem 1.25rem;
+    margin-bottom: 1.5rem;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-family: var(--mono);
+    font-size: 12px;
+  }
+  .detected-banner {
+    background: rgba(255, 68, 85, 0.08);
+    border: 1px solid rgba(255, 68, 85, 0.3);
+    color: #ff9999;
+  }
+  .evaded-banner {
+    background: rgba(0, 255, 136, 0.06);
+    border: 1px solid rgba(0, 255, 136, 0.25);
+    color: #aaffcc;
+  }
+  .unknown-banner {
+    background: rgba(122, 155, 181, 0.06);
+    border: 1px solid var(--border);
+    color: var(--text-sec);
+  }
+</style>
+{% endblock %} {% block content %}
+<div style="max-width: 1100px">
+  <div
+    style="
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      margin-bottom: 1.5rem;
+      flex-wrap: wrap;
+      gap: 1rem;
+    "
+  >
+    <div>
+      <div
+        style="
+          font-family: var(--mono);
+          font-size: 10px;
+          letter-spacing: 2px;
+          color: var(--text-dim);
+          text-transform: uppercase;
+          margin-bottom: 6px;
+        "
+      >
+        Exfiltration Module
+      </div>
+      <div
+        style="
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          margin-bottom: 4px;
+        "
+      >
+        <div class="pg-title">Run #{{ result.pk }}</div>
+        <span
+          class="tech-badge {% if result.technique == 'dns' %}tech-dns{% elif result.technique == 'http' %}tech-http{% else %}tech-icmp{% endif %}"
+        >
+          {{ result.get_technique_display }}
+        </span>
+      </div>
+      <div
+        style="
+          font-family: var(--mono);
+          font-size: 11px;
+          color: var(--text-dim);
+        "
+      >
+        {{ result.created_at|date:"Y-m-d H:i" }} &nbsp;·&nbsp; 
+        {% if result.agent %}Agent: {{ result.agent.agent_id }}{% else %}Agent:
+        unknown{% endif %} &nbsp;·&nbsp; Profile: {{ result.get_profile_display }}
+      </div>
+    </div>
+    <a href="{% url 'scanner:exfil_dashboard' %}" class="btn btn-outline">
+      <i class="bi bi-arrow-left"></i> All Runs
+    </a>
+  </div>
+
+  <!-- Detection banner -->
+  {% if result.ids_detected is None %}
+  <div class="detection-banner unknown-banner">
+    <i
+      class="bi bi-question-circle"
+      style="font-size: 18px; flex-shrink: 0"
+    ></i>
+    <strong>IDS Detection Status: Unknown</strong> — Mark result below after
+    checking IDS dashboard.
+  </div>
+  {% elif result.ids_detected %}
+  <div class="detection-banner detected-banner">
+    <i
+      class="bi bi-exclamation-triangle-fill"
+      style="font-size: 18px; flex-shrink: 0; color: var(--red)"
+    ></i>
+    <div>
+      <strong>IDS DETECTED this run.</strong>{% if result.ids_detection_notes %}
+      {{ result.ids_detection_notes }}{% endif %}
+    </div>
+  </div>
+  {% else %}
+  <div class="detection-banner evaded-banner">
+    <i
+      class="bi bi-shield-check"
+      style="font-size: 18px; flex-shrink: 0; color: var(--green)"
+    ></i>
+    <div>
+      <strong>IDS EVADED — run was not detected.</strong>
+      {% if result.ids_detection_notes %} {{ result.ids_detection_notes }}{% endif %}
+    </div>
+  </div>
+  {% endif %}
+
+  <div
+    style="
+      display: grid;
+      grid-template-columns: 1fr 300px;
+      gap: 1.5rem;
+      align-items: start;
+    "
+  >
+    <div>
+      <!-- Stats -->
+      <div
+        class="stat-grid"
+        style="grid-template-columns: repeat(4, 1fr); margin-bottom: 1.5rem"
+      >
+        <div class="stat-card">
+          <div class="stat-label">Total Chunks</div>
+          <div class="stat-value">{{ result.total_chunks }}</div>
+        </div>
+        <div class="stat-card success">
+          <div class="stat-label">Sent OK</div>
+          <div class="stat-value" style="color: var(--green)">
+            {{ result.successful }}
+          </div>
+        </div>
+        <div class="stat-card danger">
+          <div class="stat-label">Errors</div>
+          <div class="stat-value risk-HIGH">{{ result.errors }}</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Duration</div>
+          <div class="stat-value" style="font-size: 22px">
+            {{ result.duration_sec|floatformat:1 }}s
+          </div>
+        </div>
+      </div>
+
+      <!-- Metrics -->
+      <div class="card" style="margin-bottom: 1.5rem">
+        <div class="card-header">
+          <div class="card-title">
+            <i class="bi bi-bar-chart"></i> Run Metrics
+          </div>
+        </div>
+        <div style="padding: 1.25rem">
+          <div class="kv-row">
+            <span class="kv-k">Technique</span
+            ><span class="kv-v">{{ result.get_technique_display }}</span>
+          </div>
+          <div class="kv-row">
+            <span class="kv-k">Behavioral Profile</span
+            ><span class="kv-v">{{ result.get_profile_display }}</span>
+          </div>
+          <div class="kv-row">
+            <span class="kv-k">Target</span
+            ><span class="kv-v" style="color: var(--cyan)"
+              >{{ result.target|default:"—" }}</span
+            >
+          </div>
+          <div class="kv-row">
+            <span class="kv-k">Success Rate</span
+            ><span class="kv-v" style="color: var(--green)"
+              >{{ result.success_rate|floatformat:2 }}</span
+            >
+          </div>
+          <div class="kv-row">
+            <span class="kv-k">Avg Interval</span
+            ><span class="kv-v"
+              >{{ result.avg_interval_sec|floatformat:2 }}s</span
+            >
+          </div>
+          <div class="kv-row">
+            <span class="kv-k">IDS Severity</span>
+            <span class="kv-v risk-{{ result.ids_severity }}"
+              >{{ result.ids_severity|default:"—" }}</span
+            >
+          </div>
+        </div>
+      </div>
+
+      <!-- Detection signatures -->
+      {% if result.ids_signatures %}
+      <div class="card" style="margin-bottom: 1.5rem">
+        <div class="card-header">
+          <div class="card-title">
+            <i class="bi bi-eye"></i> IDS Detection Signatures Generated
+          </div>
+        </div>
+        <div style="padding: 1.25rem">
+          {% for sig in result.ids_signatures %}
+          <div class="sig-item"><span class="sig-dot">•</span>{{ sig }}</div>
+          {% endfor %}
+        </div>
+      </div>
+      {% endif %}
+
+      <!-- Packet log -->
+      <div class="section-title" style="margin-bottom: 1rem">Packet Log</div>
+      <div class="card">
+        <div style="overflow-x: auto; max-height: 460px; overflow-y: auto">
+          <table class="data-table">
+            <thead style="position: sticky; top: 0; z-index: 1">
+              <tr>
+                <th>#</th>
+                {% if result.technique == 'dns' %}
+                <th>Query Domain</th>
+                <th>Label Len</th>
+                <th>Outcome</th>
+                {% elif result.technique == 'http' %}
+                <th>Header</th>
+                <th>Value (truncated)</th>
+                <th>HTTP Status</th>
+                {% else %}
+                <th>Target IP</th>
+                <th>Payload B</th>
+                <th>Sent</th>
+                {% endif %}
+                <th>ms</th>
+                <th>Time</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for p in packets %}
+              <tr>
+                <td
+                  class="mono"
+                  style="font-size: 10px; color: var(--text-dim)"
+                >
+                  {{ p.sequence }}
+                </td>
+                {% if result.technique == 'dns' %}
+                <td class="mono" style="font-size: 11px; color: var(--cyan)">
+                  {{ p.query_domain|default:p.encoded_label|truncatechars:50 }}
+                </td>
+                <td class="mono" style="font-size: 11px">
+                  {{ p.label_length }}
+                </td>
+                <td
+                  class="mono"
+                  style="font-size:11px;{% if p.outcome == 'NXDOMAIN' %}color:var(--amber){% elif p.outcome == 'RESOLVED' %}color:var(--green){% else %}color:var(--red){% endif %}"
+                >
+                  {{ p.outcome }}
+                </td>
+                {% elif result.technique == 'http' %}
+                <td class="mono" style="font-size: 11px; color: var(--amber)">
+                  {{ p.header_name }}
+                </td>
+                <td
+                  class="mono"
+                  style="font-size: 10px; color: var(--text-sec)"
+                >
+                  {{ p.header_value|truncatechars:50 }}
+                </td>
+                <td
+                  class="mono"
+                  style="font-size:11px;{% if p.http_status == 200 %}color:var(--green){% elif p.http_status == 0 %}color:var(--red){% else %}color:var(--amber){% endif %}"
+                >
+                  {{ p.http_status|default:"—" }}
+                </td>
+                {% else %}
+                <td class="mono" style="font-size: 11px; color: var(--cyan)">
+                  {{ p.target_ip }}
+                </td>
+                <td class="mono" style="font-size: 11px">
+                  {{ p.payload_bytes }}B
+                  <span style="color: var(--text-dim)"
+                    >(+{{ p.excess_bytes }} excess)</span
+                  >
+                </td>
+                <td
+                  class="mono"
+                  style="font-size:11px;{% if p.sent %}color:var(--green){% else %}color:var(--red){% endif %}"
+                >
+                  {% if p.sent %}✓{% else %}✗ {{ p.error|truncatechars:20 }}
+                  {% endif %}
+                </td>
+                {% endif %}
+                <td
+                  class="mono"
+                  style="font-size: 10px; color: var(--text-dim)"
+                >
+                  {{ p.elapsed_ms|floatformat:0 }}
+                </td>
+                <td
+                  class="mono"
+                  style="font-size: 10px; color: var(--text-dim)"
+                >
+                  {{ p.timestamp|slice:"11:19" }}
+                </td>
+              </tr>
+              {% empty %}
+              <tr>
+                <td
+                  colspan="5"
+                  style="
+                    text-align: center;
+                    padding: 2rem;
+                    color: var(--text-dim);
+                    font-family: var(--mono);
+                    font-size: 12px;
+                  "
+                >
+                  No packet data.
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right panel -->
+    <div>
+      <div class="mark-form" style="margin-bottom: 1rem">
+        <div class="mark-title">
+          <i class="bi bi-shield-exclamation" style="color: var(--cyan)"></i>
+          &nbsp;Mark IDS Result
+        </div>
+        <form
+          method="post"
+          action="{% url 'scanner:exfil_mark_detected' result.pk %}"
+        >
+          {% csrf_token %}
+          <textarea
+            name="notes"
+            class="notes-input"
+            placeholder="e.g. IDS alert after 3 DNS queries..."
+          >
+{{ result.ids_detection_notes }}</textarea
+          >
+          <button
+            type="submit"
+            name="detected"
+            value="true"
+            class="btn-detected"
+          >
+            <i class="bi bi-exclamation-triangle"></i> Detected
+          </button>
+          <button
+            type="submit"
+            name="detected"
+            value="false"
+            class="btn-evaded"
+          >
+            <i class="bi bi-shield-check"></i> Evaded
+          </button>
+        </form>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">
+            <i class="bi bi-info-circle"></i> Technique Info
+          </div>
+        </div>
+        <div
+          style="
+            padding: 1rem;
+            font-family: var(--mono);
+            font-size: 11px;
+            color: var(--text-sec);
+            line-height: 1.8;
+          "
+        >
+          {% if result.technique == 'dns' %}
+          <strong style="color: var(--cyan)">DNS Tunnelling</strong><br />
+          Data encoded as Base32 subdomain labels and sent via DNS queries. IDS
+          detects unusually long labels and high query volume. 
+          {% elif result.technique == 'http' %}
+          <strong style="color: var(--amber)">HTTP Header Injection</strong
+          ><br />
+          Data hidden in HTTP request headers (User-Agent, X-Request-ID, etc.).
+          Requires deep packet inspection to detect. {% else %}
+          <strong style="color: var(--red)">ICMP Payload Stuffing</strong><br />
+          Data embedded in ICMP echo payload beyond the normal 8 bytes. IDS
+          detects oversized payloads via DPI. {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

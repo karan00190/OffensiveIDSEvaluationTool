@@ -1,0 +1,1027 @@
+<!-- scanner/templates/scanner/scan_form.html -->
+{% extends "scanner/base.html" %} {% block title %}Launch Scan{% endblock %} 
+{% block extra_css %}
+<style>
+  .pg-header {
+    margin-bottom: 2rem;
+    width: 100%;
+  }
+  .pg-eyebrow {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 2px;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    margin-bottom: 6px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .pg-eyebrow::before {
+    content: "";
+    width: 24px;
+    height: 1px;
+    background: var(--cyan-dim);
+  }
+  .pg-title {
+    font-family: var(--cond);
+    font-size: 28px;
+    font-weight: 700;
+    letter-spacing: 2px;
+  }
+  .pg-sub {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text-dim);
+    margin-top: 4px;
+    letter-spacing: 0.5px;
+  }
+  .scan-grid {
+    display: grid;
+    grid-template-columns: 1fr 360px; /* Left expands, right stays fixed */
+    gap: 1.5rem;
+    align-items: start;
+    width: 100%;             /* Occupy all horizontal space */
+    max-width: 100% !important; /* Override the 1060px you had before */
+  }
+  @media (max-width: 780px) {
+    .scan-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+  .form-panel {
+    background: var(--bg-panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+  }
+  .form-panel-top {
+    background: var(--bg-raised);
+    border-bottom: 1px solid var(--border);
+    padding: 1rem 1.5rem;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .fpt-icon {
+    width: 32px;
+    height: 32px;
+    border: 1px solid var(--border-md);
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--cyan);
+    font-size: 14px;
+  }
+  .fpt-title {
+    font-family: var(--cond);
+    font-size: 14px;
+    font-weight: 600;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--text-sec);
+  }
+  .fpt-step {
+    margin-left: auto;
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--text-dim);
+    letter-spacing: 1px;
+  }
+  .form-body {
+    padding: 1.75rem;
+  }
+  .field-lbl {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 8px;
+  }
+  .lbl-hint {
+    font-size: 9px;
+    color: var(--text-dim);
+    letter-spacing: 0.3px;
+  }
+  .req {
+    color: var(--red);
+  }
+  .target-wrap {
+    position: relative;
+    margin-bottom: 8px;
+  }
+  .target-input {
+    width: 100%;
+    background: var(--bg-deep);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 12px 44px 12px 14px;
+    color: var(--text-pri);
+    font-family: var(--mono);
+    font-size: 13px;
+    outline: none;
+    transition:
+      border-color 0.2s,
+      box-shadow 0.2s;
+    -webkit-appearance: none;
+  }
+  .target-input:focus {
+    border-color: var(--cyan);
+    box-shadow: 0 0 0 3px rgba(0, 212, 255, 0.1);
+  }
+  .target-input.t-valid {
+    border-color: rgba(0, 255, 136, 0.45);
+  }
+  .target-input.t-invalid {
+    border-color: rgba(255, 68, 85, 0.45);
+  }
+  .target-input::placeholder {
+    color: var(--text-dim);
+  }
+  .t-status-icon {
+    position: absolute;
+    right: 13px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 15px;
+    transition: all 0.2s;
+    pointer-events: none;
+  }
+  .si-idle {
+    color: var(--text-dim);
+  }
+  .si-ok {
+    color: var(--green);
+  }
+  .si-err {
+    color: var(--red);
+  }
+  .target-meta {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 1.5rem;
+    flex-wrap: wrap;
+  }
+  .type-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.8px;
+    padding: 3px 10px;
+    border-radius: 20px;
+    border: 1px solid var(--border);
+    color: var(--text-dim);
+    background: var(--bg-raised);
+    transition: all 0.2s;
+  }
+  .tp-ip {
+    border-color: rgba(0, 212, 255, 0.3);
+    color: var(--cyan);
+    background: rgba(0, 212, 255, 0.06);
+  }
+  .tp-cidr {
+    border-color: rgba(0, 255, 136, 0.3);
+    color: var(--green);
+    background: rgba(0, 255, 136, 0.06);
+  }
+  .tp-host {
+    border-color: rgba(255, 170, 0, 0.3);
+    color: var(--amber);
+    background: rgba(255, 170, 0, 0.06);
+  }
+  .tp-err {
+    border-color: rgba(255, 68, 85, 0.3);
+    color: var(--red);
+    background: rgba(255, 68, 85, 0.06);
+  }
+  .val-err-msg {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--red);
+    letter-spacing: 0.3px;
+  }
+  .profile-lbl {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 10px;
+  }
+  .prof-cards {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 8px;
+    margin-bottom: 1.5rem;
+  }
+  @media (max-width: 480px) {
+    .prof-cards {
+      grid-template-columns: repeat(2, 1fr);
+    }
+  }
+  .pc {
+    background: var(--bg-deep);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 14px 10px;
+    cursor: pointer;
+    transition: all 0.2s;
+    position: relative;
+    overflow: hidden;
+    text-align: center;
+    -webkit-user-select: none;
+    user-select: none;
+  }
+  .pc::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: var(--pc-col, var(--border));
+    transition: box-shadow 0.2s;
+  }
+  .pc:hover {
+    border-color: var(--border-md);
+    background: var(--bg-raised);
+  }
+  .pc.sel {
+    border-color: var(--pc-col, var(--cyan));
+    background: var(--bg-raised);
+  }
+  .pc.sel::before {
+    box-shadow: 0 0 10px var(--pc-col, var(--cyan));
+  }
+  .pc-icon {
+    font-size: 18px;
+    color: var(--text-dim);
+    margin-bottom: 7px;
+    display: block;
+    transition: color 0.2s;
+  }
+  .pc.sel .pc-icon {
+    color: var(--pc-col, var(--cyan));
+  }
+  .pc-name {
+    font-family: var(--cond);
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: var(--text-sec);
+    transition: color 0.2s;
+  }
+  .pc.sel .pc-name {
+    color: var(--text-pri);
+  }
+  .pc-time {
+    font-family: var(--mono);
+    font-size: 9px;
+    color: var(--text-dim);
+    margin-top: 3px;
+    transition: color 0.2s;
+  }
+  .pc.sel .pc-time {
+    color: var(--pc-col);
+  }
+  .p-fast {
+    --pc-col: var(--green);
+  }
+  .p-default {
+    --pc-col: var(--cyan);
+  }
+  .p-deep {
+    --pc-col: var(--amber);
+  }
+  .p-ping {
+    --pc-col: var(--blue);
+  }
+  .cmd-preview {
+    background: var(--bg-deep);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 11px 14px;
+    margin-bottom: 1.5rem;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .cmd-ps {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text-dim);
+    flex-shrink: 0;
+  }
+  .cmd-txt {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--cyan);
+    flex: 1;
+    word-break: break-all;
+    letter-spacing: 0.2px;
+  }
+  .cmd-copy-btn {
+    background: none;
+    border: none;
+    color: var(--text-dim);
+    cursor: pointer;
+    font-size: 13px;
+    padding: 0;
+    flex-shrink: 0;
+    transition: color 0.15s;
+  }
+  .cmd-copy-btn:hover {
+    color: var(--cyan);
+  }
+  .cache-row {
+    display: flex;
+    gap: 12px;
+    align-items: flex-start;
+    background: rgba(0, 212, 255, 0.04);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--cyan);
+    border-radius: 0 6px 6px 0;
+    padding: 11px 14px;
+    margin-bottom: 1.75rem;
+  }
+  .cr-icon {
+    color: var(--cyan);
+    font-size: 14px;
+    flex-shrink: 0;
+    margin-top: 1px;
+  }
+  .cr-title {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 1px;
+    color: var(--cyan);
+    text-transform: uppercase;
+    margin-bottom: 4px;
+  }
+  .cr-desc {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text-sec);
+    line-height: 1.6;
+  }
+  .submit-btn {
+    width: 100%;
+    padding: 14px;
+    font-family: var(--cond);
+    font-size: 15px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    background: var(--cyan);
+    color: var(--bg-deep);
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s;
+    box-shadow: 0 0 20px rgba(0, 212, 255, 0.2);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+  }
+  .submit-btn:hover:not(:disabled) {
+    background: #33ddff;
+    box-shadow: 0 0 32px rgba(0, 212, 255, 0.4);
+    transform: translateY(-1px);
+  }
+  .submit-btn:disabled {
+    background: var(--text-dim);
+    box-shadow: none;
+    cursor: not-allowed;
+    transform: none;
+  }
+  .info-stack {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+  }
+  .info-card {
+    background: var(--bg-panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+  }
+  .ic-hd {
+    background: var(--bg-raised);
+    border-bottom: 1px solid var(--border);
+    padding: 0.75rem 1.25rem;
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .ic-hd i {
+    color: var(--cyan);
+    font-size: 12px;
+  }
+  .ic-body {
+    padding: 1rem 1.25rem;
+  }
+  .pd {
+    display: none;
+  }
+  .pd.active {
+    display: block;
+  }
+  .pd-name {
+    font-family: var(--cond);
+    font-size: 18px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    margin-bottom: 0.5rem;
+  }
+  .pd-flags {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--cyan);
+    background: var(--bg-deep);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 6px 10px;
+    margin-bottom: 0.75rem;
+  }
+  .pd-rows {
+    display: flex;
+    flex-direction: column;
+  }
+  .pd-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 6px 0;
+    border-bottom: 1px solid rgba(0, 212, 255, 0.05);
+  }
+  .pd-row:last-child {
+    border-bottom: none;
+  }
+  .pd-k {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.5px;
+    color: var(--text-dim);
+  }
+  .pd-v {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text-pri);
+  }
+  .pd-v.g {
+    color: var(--green);
+  }
+  .pd-v.w {
+    color: var(--amber);
+  }
+  .pd-v.i {
+    color: var(--cyan);
+  }
+  .tips {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .tip {
+    display: flex;
+    gap: 8px;
+    align-items: flex-start;
+  }
+  .tip-ic {
+    font-size: 10px;
+    margin-top: 2px;
+    flex-shrink: 0;
+  }
+  .tip-tx {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text-sec);
+    line-height: 1.5;
+  }
+  .tip-mo {
+    color: var(--cyan);
+  }
+  .sec-notice {
+    background: rgba(255, 68, 85, 0.04);
+    border: 1px solid rgba(255, 68, 85, 0.18);
+    border-radius: 6px;
+    padding: 0.875rem 1rem;
+    display: flex;
+    gap: 10px;
+    align-items: flex-start;
+  }
+  .sn-ic {
+    color: var(--red);
+    font-size: 13px;
+    flex-shrink: 0;
+    margin-top: 1px;
+  }
+  .sn-tx {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: #cc9999;
+    line-height: 1.6;
+  }
+</style>
+{% endblock %} 
+{% block content %}
+<div style="max-width: 1060px">
+  <div class="pg-header">
+    <div class="pg-eyebrow">Target Assessment</div>
+    <div class="pg-title">Launch Scan</div>
+    <div class="pg-sub">
+      CONFIGURE TARGET &nbsp;&middot;&nbsp; SELECT PROFILE &nbsp;&middot;&nbsp;
+      INITIATE
+    </div>
+  </div>
+
+  <div class="scan-grid">
+    <div class="form-panel">
+      <div class="form-panel-top">
+        <div class="fpt-icon"><i class="bi bi-crosshair"></i></div>
+        <div class="fpt-title">Target Configuration</div>
+        <div class="fpt-step" id="step-ind">STEP 1 OF 3</div>
+      </div>
+      <div class="form-body">
+        <form method="post" id="scan-form">
+          {% csrf_token %}
+          <div>
+            <div class="field-lbl">
+              Target <span class="req">*</span
+              ><span class="lbl-hint">IP &middot; CIDR &middot; HOSTNAME</span>
+            </div>
+            <div class="target-wrap">
+              <input
+                type="text"
+                name="target"
+                id="target-inp"
+                class="target-input {% if form.target.errors %}t-invalid{% endif %}"
+                value="{{ form.target.value|default:'' }}"
+                placeholder="192.168.1.1  or  10.0.0.0/24  or  scanme.nmap.org"
+                autocomplete="off"
+                spellcheck="false"
+                oninput="validateTarget(this.value)"
+              />
+              <span class="t-status-icon si-idle" id="t-icon"
+                ><i class="bi bi-dash-circle"></i
+              ></span>
+            </div>
+            <div class="target-meta">
+              <span class="type-pill" id="type-pill"
+                ><i class="bi bi-question-circle"></i> Enter target above</span
+              >
+              {% if form.target.errors %}
+              <span class="val-err-msg"
+                ><i class="bi bi-exclamation-circle"></i> {{
+                form.target.errors.0 }}</span
+              >
+              {% else %}
+              <span class="val-err-msg" id="val-err-msg"></span>
+              {% endif %}
+            </div>
+          </div>
+          <div>
+            <div class="profile-lbl">
+              Scan Profile
+              <span class="lbl-hint" style="margin-left: 4px">SELECT ONE</span>
+            </div>
+            <div class="prof-cards">
+              <div
+                class="pc p-fast"
+                onclick="selProfile('fast', this)"
+                data-p="fast"
+              >
+                <i class="bi bi-lightning-fill pc-icon"></i>
+                <div class="pc-name">Fast</div>
+                <div class="pc-time">~15 sec</div>
+              </div>
+              <div
+                class="pc p-default sel"
+                onclick="selProfile('default', this)"
+                data-p="default"
+              >
+                <i class="bi bi-radar pc-icon"></i>
+                <div class="pc-name">Default</div>
+                <div class="pc-time">~60 sec</div>
+              </div>
+              <div
+                class="pc p-deep"
+                onclick="selProfile('deep', this)"
+                data-p="deep"
+              >
+                <i class="bi bi-layers pc-icon"></i>
+                <div class="pc-name">Deep</div>
+                <div class="pc-time">5-30 min</div>
+              </div>
+              <div
+                class="pc p-ping"
+                onclick="selProfile('ping', this)"
+                data-p="ping"
+              >
+                <i class="bi bi-wifi pc-icon"></i>
+                <div class="pc-name">Ping</div>
+                <div class="pc-time">~5 sec</div>
+              </div>
+            </div>
+            <input
+              type="hidden"
+              name="scan_profile"
+              id="profile-val"
+              value="{{ form.scan_profile.value|default:'default' }}"
+            />
+          </div>
+          <div class="cmd-preview">
+            <span class="cmd-ps">$</span>
+            <span class="cmd-txt" id="cmd-txt"
+              >nmap -sV -T4 --top-ports 1000 &lt;target&gt;</span
+            >
+            <button
+              type="button"
+              class="cmd-copy-btn"
+              id="copy-btn"
+              onclick="copyCmd()"
+              title="Copy"
+            >
+              <i class="bi bi-clipboard"></i>
+            </button>
+          </div>
+          <div class="cache-row">
+            <span class="cr-icon"><i class="bi bi-lightning-charge"></i></span>
+            <div>
+              <div class="cr-title">Smart Cache Active</div>
+              <div class="cr-desc">
+                Same target + profile scanned within
+                <strong style="color: var(--cyan)">1 hour</strong> returns
+                instantly - no re-scan, no wait.
+              </div>
+            </div>
+          </div>
+          <button type="submit" class="submit-btn" id="submit-btn">
+            <i class="bi bi-play-fill"></i>
+            <span id="submit-lbl">Initiate Scan</span>
+          </button>
+        </form>
+      </div>
+    </div>
+
+    <div class="info-stack">
+      <div class="info-card">
+        <div class="ic-hd">
+          <i class="bi bi-info-circle"></i> Profile Details
+        </div>
+        <div class="ic-body">
+          <div class="pd" id="pd-fast">
+            <div class="pd-name" style="color: var(--green)">Fast Scan</div>
+            <div class="pd-flags">nmap -sV -T4 -F</div>
+            <div class="pd-rows">
+              <div class="pd-row">
+                <span class="pd-k">Ports</span
+                ><span class="pd-v g">Top 100</span>
+              </div>
+              <div class="pd-row">
+                <span class="pd-k">Version detect</span
+                ><span class="pd-v g">Yes</span>
+              </div>
+              <div class="pd-row">
+                <span class="pd-k">OS detection</span
+                ><span class="pd-v" style="color: var(--text-dim)">No</span>
+              </div>
+              <div class="pd-row">
+                <span class="pd-k">Needs root</span
+                ><span class="pd-v g">No</span>
+              </div>
+              <div class="pd-row">
+                <span class="pd-k">Duration</span
+                ><span class="pd-v i">~15 seconds</span>
+              </div>
+              <div class="pd-row">
+                <span class="pd-k">Best for</span
+                ><span class="pd-v" style="color: var(--text-sec)"
+                  >Quick recon</span
+                >
+              </div>
+            </div>
+          </div>
+          <div class="pd active" id="pd-default">
+            <div class="pd-name" style="color: var(--cyan)">Default Scan</div>
+            <div class="pd-flags">nmap -sV -T4 --top-ports 1000</div>
+            <div class="pd-rows">
+              <div class="pd-row">
+                <span class="pd-k">Ports</span
+                ><span class="pd-v i">Top 1000</span>
+              </div>
+              <div class="pd-row">
+                <span class="pd-k">Version detect</span
+                ><span class="pd-v g">Yes</span>
+              </div>
+              <div class="pd-row">
+                <span class="pd-k">OS detection</span
+                ><span class="pd-v" style="color: var(--text-dim)">No</span>
+              </div>
+              <div class="pd-row">
+                <span class="pd-k">Needs root</span
+                ><span class="pd-v g">No</span>
+              </div>
+              <div class="pd-row">
+                <span class="pd-k">Duration</span
+                ><span class="pd-v i">~60 seconds</span>
+              </div>
+              <div class="pd-row">
+                <span class="pd-k">Best for</span
+                ><span class="pd-v" style="color: var(--text-sec)"
+                  >General assessment</span
+                >
+              </div>
+            </div>
+          </div>
+          <div class="pd" id="pd-deep">
+            <div class="pd-name" style="color: var(--amber)">Deep Scan</div>
+            <div class="pd-flags">nmap -sS -sV -O -T4 -p-</div>
+            <div class="pd-rows">
+              <div class="pd-row">
+                <span class="pd-k">Ports</span
+                ><span class="pd-v w">All 65535</span>
+              </div>
+              <div class="pd-row">
+                <span class="pd-k">Version detect</span
+                ><span class="pd-v g">Yes</span>
+              </div>
+              <div class="pd-row">
+                <span class="pd-k">OS detection</span
+                ><span class="pd-v w">Yes</span>
+              </div>
+              <div class="pd-row">
+                <span class="pd-k">Needs root</span
+                ><span class="pd-v w">Yes - sudo</span>
+              </div>
+              <div class="pd-row">
+                <span class="pd-k">Duration</span
+                ><span class="pd-v w">5-30 minutes</span>
+              </div>
+              <div class="pd-row">
+                <span class="pd-k">Best for</span
+                ><span class="pd-v" style="color: var(--text-sec)"
+                  >Full audit</span
+                >
+              </div>
+            </div>
+          </div>
+          <div class="pd" id="pd-ping">
+            <div class="pd-name" style="color: var(--blue)">Ping Sweep</div>
+            <div class="pd-flags">nmap -sn</div>
+            <div class="pd-rows">
+              <div class="pd-row">
+                <span class="pd-k">Ports</span
+                ><span class="pd-v" style="color: var(--text-dim)">None</span>
+              </div>
+              <div class="pd-row">
+                <span class="pd-k">Version detect</span
+                ><span class="pd-v" style="color: var(--text-dim)">No</span>
+              </div>
+              <div class="pd-row">
+                <span class="pd-k">OS detection</span
+                ><span class="pd-v" style="color: var(--text-dim)">No</span>
+              </div>
+              <div class="pd-row">
+                <span class="pd-k">Needs root</span
+                ><span class="pd-v g">No</span>
+              </div>
+              <div class="pd-row">
+                <span class="pd-k">Duration</span
+                ><span class="pd-v g">~5 seconds</span>
+              </div>
+              <div class="pd-row">
+                <span class="pd-k">Best for</span
+                ><span class="pd-v" style="color: var(--text-sec)"
+                  >Host discovery</span
+                >
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="info-card">
+        <div class="ic-hd"><i class="bi bi-terminal"></i> Target Examples</div>
+        <div class="ic-body">
+          <div class="tips">
+            <div class="tip">
+              <span class="tip-ic" style="color: var(--cyan)"
+                ><i class="bi bi-dot"></i
+              ></span>
+              <div class="tip-tx">
+                Single IP: <span class="tip-mo">192.168.1.1</span>
+              </div>
+            </div>
+            <div class="tip">
+              <span class="tip-ic" style="color: var(--green)"
+                ><i class="bi bi-dot"></i
+              ></span>
+              <div class="tip-tx">
+                Subnet: <span class="tip-mo">10.0.0.0/24</span> - 256 hosts
+              </div>
+            </div>
+            <div class="tip">
+              <span class="tip-ic" style="color: var(--amber)"
+                ><i class="bi bi-dot"></i
+              ></span>
+              <div class="tip-tx">
+                Hostname: <span class="tip-mo">scanme.nmap.org</span>
+              </div>
+            </div>
+            <div class="tip">
+              <span class="tip-ic" style="color: var(--blue)"
+                ><i class="bi bi-dot"></i
+              ></span>
+              <div class="tip-tx">
+                IP range: <span class="tip-mo">192.168.1.1-50</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="sec-notice">
+        <span class="sn-ic"><i class="bi bi-shield-exclamation"></i></span>
+        <div class="sn-tx">
+          Only scan systems you own or have
+          <strong style="color: #ffaaaa">explicit written permission</strong> to
+          test. Unauthorized scanning may be illegal.
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %} {% block extra_js %}
+<script>
+  const PROFILES = {
+    fast: "nmap -sV -T4 -F",
+    default: "nmap -sV -T4 --top-ports 1000",
+    deep: "nmap -sS -sV -O -T4 -p-",
+    ping: "nmap -sn",
+  };
+  let curProfile = '{{ form.scan_profile.value|default:"default" }}',
+    targetValid = false;
+  function selProfile(p, el) {
+    document.querySelectorAll(".pc").forEach((c) => c.classList.remove("sel"));
+    el.classList.add("sel");
+    curProfile = p;
+    document.getElementById("profile-val").value = p;
+    document
+      .querySelectorAll(".pd")
+      .forEach((d) => d.classList.remove("active"));
+    document.getElementById("pd-" + p).classList.add("active");
+    updateCmd();
+  }
+  function updateCmd() {
+    const t = document.getElementById("target-inp").value.trim() || "<target>";
+    document.getElementById("cmd-txt").textContent =
+      PROFILES[curProfile] + " " + t;
+  }
+  function validateTarget(val) {
+    const s = val.trim();
+    const icon = document.getElementById("t-icon");
+    const pill = document.getElementById("type-pill");
+    const errEl = document.getElementById("val-err-msg");
+    const inp = document.getElementById("target-inp");
+    if (!s) {
+      icon.className = "t-status-icon si-idle";
+      icon.innerHTML = '<i class="bi bi-dash-circle"></i>';
+      pill.className = "type-pill";
+      pill.innerHTML =
+        '<i class="bi bi-question-circle"></i> Enter target above';
+      if (errEl) errEl.textContent = "";
+      inp.classList.remove("t-valid", "t-invalid");
+      targetValid = false;
+      updateBtn();
+      updateCmd();
+      updateStep();
+      return;
+    }
+    const ipv4 = /^(\d{1,3}\.){3}\d{1,3}$/;
+    const cidr = /^(\d{1,3}\.){3}\d{1,3}\/\d{1,2}$/;
+    const range = /^(\d{1,3}\.){3}\d{1,3}-\d{1,3}$/;
+    const host =
+      /^([a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?\.)*[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?$/;
+    let ok = false,
+      ptype = "",
+      pmsg = "",
+      perr = "";
+    if (cidr.test(s)) {
+      const mask = parseInt(s.split("/")[1]);
+      if (mask >= 0 && mask <= 32) {
+        ok = true;
+        ptype = "tp-cidr";
+        const h = mask <= 30 ? Math.pow(2, 32 - mask) - 2 : 1;
+        pmsg =
+          '<i class="bi bi-diagram-3"></i> CIDR - ' +
+          h +
+          " host" +
+          (h !== 1 ? "s" : "");
+      } else {
+        perr = "Invalid mask (0-32)";
+      }
+    } else if (range.test(s)) {
+      ok = true;
+      ptype = "tp-cidr";
+      pmsg = '<i class="bi bi-list-ol"></i> IP range';
+    } else if (ipv4.test(s)) {
+      const octs = s.split(".").map(Number);
+      ok = octs.every((o) => o >= 0 && o <= 255);
+      ptype = ok ? "tp-ip" : "";
+      pmsg = ok ? '<i class="bi bi-hdd-network"></i> IPv4 address' : "";
+      perr = ok ? "" : "Invalid octet (0-255)";
+    } else if (host.test(s) && s.length > 1) {
+      ok = true;
+      ptype = "tp-host";
+      pmsg = '<i class="bi bi-globe"></i> Hostname';
+    } else {
+      perr = "Not a valid IP, subnet, or hostname";
+    }
+    targetValid = ok;
+    inp.classList.toggle("t-valid", ok);
+    inp.classList.toggle("t-invalid", !ok);
+    if (ok) {
+      icon.className = "t-status-icon si-ok";
+      icon.innerHTML = '<i class="bi bi-check-circle-fill"></i>';
+      pill.className = "type-pill " + ptype;
+      pill.innerHTML = pmsg;
+      if (errEl) errEl.textContent = "";
+    } else {
+      icon.className = "t-status-icon si-err";
+      icon.innerHTML = '<i class="bi bi-x-circle-fill"></i>';
+      pill.className = "type-pill tp-err";
+      pill.innerHTML =
+        '<i class="bi bi-exclamation-circle"></i> Invalid target';
+      if (errEl) errEl.textContent = perr;
+    }
+    updateBtn();
+    updateCmd();
+    updateStep();
+  }
+  function updateBtn() {
+    document.getElementById("submit-btn").disabled = !targetValid;
+  }
+  function updateStep() {
+    const ind = document.getElementById("step-ind");
+    const t = document.getElementById("target-inp").value.trim();
+    if (!t) ind.textContent = "STEP 1 OF 3";
+    else if (!targetValid) ind.textContent = "FIX TARGET";
+    else ind.textContent = "READY TO LAUNCH";
+  }
+  function copyCmd() {
+    navigator.clipboard
+      .writeText(document.getElementById("cmd-txt").textContent)
+      .then(() => {
+        const b = document.getElementById("copy-btn");
+        b.innerHTML = '<i class="bi bi-clipboard-check"></i>';
+        setTimeout(
+          () => (b.innerHTML = '<i class="bi bi-clipboard"></i>'),
+          1500,
+        );
+      });
+  }
+  document.getElementById("scan-form").addEventListener("submit", function () {
+    const btn = document.getElementById("submit-btn");
+    btn.innerHTML =
+      '<i class="bi bi-hourglass-split"></i> <span>Queuing...</span>';
+    btn.disabled = true;
+  });
+  (function () {
+    const saved = document.getElementById("profile-val").value;
+    const el = document.querySelector('[data-p="' + saved + '"]');
+    if (el && saved !== "default") {
+      document
+        .querySelectorAll(".pc")
+        .forEach((c) => c.classList.remove("sel"));
+      el.classList.add("sel");
+      document
+        .querySelectorAll(".pd")
+        .forEach((d) => d.classList.remove("active"));
+      document.getElementById("pd-" + saved).classList.add("active");
+      curProfile = saved;
+    }
+    const t = document.getElementById("target-inp").value;
+    if (t) validateTarget(t);
+    updateCmd();
+  })();
+</script>
+{% endblock %}

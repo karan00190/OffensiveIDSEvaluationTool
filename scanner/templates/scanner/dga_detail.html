@@ -1,0 +1,746 @@
+<!-- scanner/templates/scanner/dga_detail.html -->
+{% extends "scanner/base.html" %} {% block title %}DGA Run #{{ result.pk }}
+{%endblock %} {% block extra_css %}
+<style>
+  .pg-eyebrow {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 2px;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    margin-bottom: 6px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .pg-eyebrow::before {
+    content: "";
+    width: 24px;
+    height: 1px;
+    background: var(--cyan-dim);
+  }
+  .pg-title {
+    font-family: var(--cond);
+    font-size: 24px;
+    font-weight: 700;
+    letter-spacing: 2px;
+  }
+  .algo-badge {
+    font-family: var(--mono);
+    font-size: 10px;
+    padding: 3px 10px;
+    border-radius: 3px;
+    border: 1px solid;
+    display: inline-block;
+  }
+  .algo-date {
+    border-color: rgba(0, 212, 255, 0.3);
+    color: var(--cyan);
+    background: rgba(0, 212, 255, 0.06);
+  }
+  .algo-xor {
+    border-color: rgba(255, 170, 0, 0.3);
+    color: var(--amber);
+    background: rgba(255, 170, 0, 0.06);
+  }
+  .algo-word {
+    border-color: rgba(0, 255, 136, 0.3);
+    color: var(--green);
+    background: rgba(0, 255, 136, 0.06);
+  }
+  .outcome-nx {
+    color: var(--red);
+    font-family: var(--mono);
+    font-size: 11px;
+  }
+  .outcome-ok {
+    color: var(--green);
+    font-family: var(--mono);
+    font-size: 11px;
+  }
+  .outcome-to {
+    color: var(--amber);
+    font-family: var(--mono);
+    font-size: 11px;
+  }
+  .outcome-er {
+    color: var(--text-dim);
+    font-family: var(--mono);
+    font-size: 11px;
+  }
+  .ratio-track {
+    height: 8px;
+    background: var(--border);
+    border-radius: 4px;
+    overflow: hidden;
+    margin-top: 6px;
+  }
+  .ratio-fill {
+    height: 100%;
+    border-radius: 4px;
+    background: var(--red);
+  }
+  .mark-form {
+    background: var(--bg-panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 1.25rem;
+  }
+  .mark-title {
+    font-family: var(--cond);
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: var(--text-sec);
+    margin-bottom: 1rem;
+  }
+  .mark-btns {
+    display: flex;
+    gap: 0.75rem;
+    margin-top: 1rem;
+  }
+  .btn-detected {
+    font-family: var(--cond);
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    padding: 8px 16px;
+    border-radius: 4px;
+    border: 1px solid rgba(255, 68, 85, 0.4);
+    color: var(--red);
+    background: rgba(255, 68, 85, 0.08);
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .btn-detected:hover {
+    background: rgba(255, 68, 85, 0.15);
+    border-color: var(--red);
+  }
+  .btn-evaded {
+    font-family: var(--cond);
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    padding: 8px 16px;
+    border-radius: 4px;
+    border: 1px solid rgba(0, 255, 136, 0.4);
+    color: var(--green);
+    background: rgba(0, 255, 136, 0.06);
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .btn-evaded:hover {
+    background: rgba(0, 255, 136, 0.12);
+    border-color: var(--green);
+  }
+  .notes-input {
+    width: 100%;
+    background: var(--bg-deep);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 10px 12px;
+    color: var(--text-pri);
+    font-family: var(--mono);
+    font-size: 12px;
+    outline: none;
+    transition: border-color 0.2s;
+    resize: vertical;
+    min-height: 70px;
+  }
+  .notes-input:focus {
+    border-color: var(--cyan);
+    box-shadow: 0 0 0 3px rgba(0, 212, 255, 0.1);
+  }
+  .entropy-bar {
+    display: inline-block;
+    height: 3px;
+    background: var(--cyan-dim);
+    border-radius: 2px;
+    vertical-align: middle;
+    margin-left: 6px;
+  }
+  .detection-banner {
+    border-radius: 8px;
+    padding: 1rem 1.25rem;
+    margin-bottom: 1.5rem;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-family: var(--mono);
+    font-size: 12px;
+  }
+  .detected-banner {
+    background: rgba(255, 68, 85, 0.08);
+    border: 1px solid rgba(255, 68, 85, 0.3);
+    color: #ff9999;
+  }
+  .evaded-banner {
+    background: rgba(0, 255, 136, 0.06);
+    border: 1px solid rgba(0, 255, 136, 0.25);
+    color: #aaffcc;
+  }
+  .unknown-banner {
+    background: rgba(122, 155, 181, 0.06);
+    border: 1px solid var(--border);
+    color: var(--text-sec);
+  }
+</style>
+
+{% endblock %} {% block content %}
+<div style="max-width: 1100px">
+  <!-- Header -->
+  <div
+    style="
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      margin-bottom: 1.5rem;
+      flex-wrap: wrap;
+      gap: 1rem;
+    "
+  >
+    <div>
+      <div class="pg-eyebrow">DGA Module</div>
+      <div
+        style="
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          margin-bottom: 4px;
+        "
+      >
+        <div class="pg-title">Run #{{ result.pk }}</div>
+        {% if result.algorithm == 'date_seed' %}
+        <span class="algo-badge algo-date">DATE-SEED SHA-256</span>
+        {% elif result.algorithm == 'xor_lcg' %}
+        <span class="algo-badge algo-xor">XOR + LCG</span>
+        {% else %}
+        <span class="algo-badge algo-word">WORDLIST</span>
+        {% endif %}
+      </div>
+      <div
+        style="
+          font-family: var(--mono);
+          font-size: 11px;
+          color: var(--text-dim);
+        "
+      >
+        {{ result.created_at|date:"Y-m-d H:i" }} &nbsp;·&nbsp; 
+        {% if result.agent %}Agent: {{ result.agent.agent_id }}
+        {% else %}Agent:
+        unknown
+        {% endif %}
+      </div>
+    </div>
+    <a href="{% url 'scanner:dga_dashboard' %}" class="btn btn-outline">
+      <i class="bi bi-arrow-left"></i> All DGA Runs
+    </a>
+  </div>
+
+  <!-- IDS Detection Banner -->
+  {% if result.ids_detected is None %}
+  <div class="detection-banner unknown-banner">
+    <i
+      class="bi bi-question-circle"
+      style="font-size: 18px; flex-shrink: 0"
+    ></i>
+    <div>
+      <strong>IDS Detection Status: Unknown</strong> — Check your IDS dashboard
+      and mark the result below.
+    </div>
+  </div>
+  {% elif result.ids_detected %}
+  <div class="detection-banner detected-banner">
+    <i
+      class="bi bi-exclamation-triangle-fill"
+      style="font-size: 18px; flex-shrink: 0; color: var(--red)"
+    ></i>
+    <div>
+      <strong>IDS DETECTED this run.</strong>
+      {% if result.ids_detection_notes %} Notes: {{ result.ids_detection_notes
+      }}{% endif %}
+    </div>
+  </div>
+  {% else %}
+  <div class="detection-banner evaded-banner">
+    <i
+      class="bi bi-shield-check"
+      style="font-size: 18px; flex-shrink: 0; color: var(--green)"
+    ></i>
+    <div>
+      <strong>IDS EVADED — run was not detected.</strong>
+      {% if result.ids_detection_notes %} Notes: {{ result.ids_detection_notes
+      }}{% endif %}
+    </div>
+  </div>
+  {% endif %}
+
+  <div
+    style="
+      display: grid;
+      grid-template-columns: 1fr 300px;
+      gap: 1.5rem;
+      align-items: start;
+    "
+  >
+    <div>
+      <!-- Summary stats -->
+      <div
+        class="stat-grid"
+        style="grid-template-columns: repeat(3, 1fr); margin-bottom: 1.5rem"
+      >
+        <div class="stat-card danger">
+          <div class="stat-label">NXDOMAIN</div>
+          <div class="stat-value risk-HIGH">{{ result.nxdomain_count }}</div>
+        </div>
+        <div class="stat-card success">
+          <div class="stat-label">Resolved</div>
+          <div class="stat-value" style="color: var(--green)">
+            {{ result.resolved_count }}
+          </div>
+        </div>
+        <div class="stat-card warning">
+          <div class="stat-label">Timeout</div>
+          <div class="stat-value" style="color: var(--amber)">
+            {{ result.timeout_count }}
+          </div>
+        </div>
+      </div>
+
+      <!-- Metrics card -->
+      <div class="card" style="margin-bottom: 1.5rem">
+        <div class="card-header">
+          <div class="card-title">
+            <i class="bi bi-bar-chart"></i> Run Metrics
+          </div>
+        </div>
+        <div style="padding: 1.25rem">
+          <div
+            class="kv-row"
+            style="
+              display: flex;
+              justify-content: space-between;
+              padding: 7px 0;
+              border-bottom: 1px solid rgba(0, 212, 255, 0.05);
+            "
+          >
+            <span
+              style="
+                font-family: var(--mono);
+                font-size: 10px;
+                letter-spacing: 0.5px;
+                color: var(--text-dim);
+                text-transform: uppercase;
+              "
+              >NXDOMAIN Ratio</span
+            >
+            <div style="text-align: right">
+              <span
+                style="
+                  font-family: var(--mono);
+                  font-size: 13px;
+                  color: var(--red);
+                  font-weight: 600;
+                "
+                >{{ result.nxdomain_ratio|floatformat:4 }}</span
+              >
+              <div class="ratio-track" style="width: 160px">
+                <div
+                  class="ratio-fill"
+                  style="width:{% widthratio result.nxdomain_ratio 1 100 %}%"
+                ></div>
+              </div>
+            </div>
+          </div>
+          <div
+            class="kv-row"
+            style="
+              display: flex;
+              justify-content: space-between;
+              padding: 7px 0;
+              border-bottom: 1px solid rgba(0, 212, 255, 0.05);
+            "
+          >
+            <span
+              style="
+                font-family: var(--mono);
+                font-size: 10px;
+                letter-spacing: 0.5px;
+                color: var(--text-dim);
+                text-transform: uppercase;
+              "
+              >Avg Shannon Entropy</span
+            >
+            <span
+              style="
+                font-family: var(--mono);
+                font-size: 13px;
+                color: var(--cyan);
+              "
+              >{{ result.avg_entropy }}</span
+            >
+          </div>
+          <div
+            class="kv-row"
+            style="
+              display: flex;
+              justify-content: space-between;
+              padding: 7px 0;
+              border-bottom: 1px solid rgba(0, 212, 255, 0.05);
+            "
+          >
+            <span
+              style="
+                font-family: var(--mono);
+                font-size: 10px;
+                letter-spacing: 0.5px;
+                color: var(--text-dim);
+                text-transform: uppercase;
+              "
+              >Entropy Range</span
+            >
+            <span
+              style="
+                font-family: var(--mono);
+                font-size: 12px;
+                color: var(--text-sec);
+              "
+              >{{ result.min_entropy }} — {{ result.max_entropy }}</span
+            >
+          </div>
+          <div
+            class="kv-row"
+            style="
+              display: flex;
+              justify-content: space-between;
+              padding: 7px 0;
+              border-bottom: 1px solid rgba(0, 212, 255, 0.05);
+            "
+          >
+            <span
+              style="
+                font-family: var(--mono);
+                font-size: 10px;
+                letter-spacing: 0.5px;
+                color: var(--text-dim);
+                text-transform: uppercase;
+              "
+              >Query Rate</span
+            >
+            <span
+              style="
+                font-family: var(--mono);
+                font-size: 12px;
+                color: var(--text-sec);
+              "
+              >{{ result.rate_per_sec }} queries/sec</span
+            >
+          </div>
+          <div
+            class="kv-row"
+            style="
+              display: flex;
+              justify-content: space-between;
+              padding: 7px 0;
+              border-bottom: 1px solid rgba(0, 212, 255, 0.05);
+            "
+          >
+            <span
+              style="
+                font-family: var(--mono);
+                font-size: 10px;
+                letter-spacing: 0.5px;
+                color: var(--text-dim);
+                text-transform: uppercase;
+              "
+              >Total Duration</span
+            >
+            <span
+              style="
+                font-family: var(--mono);
+                font-size: 12px;
+                color: var(--text-sec);
+              "
+              >{{ result.duration_sec|floatformat:1 }}s</span
+            >
+          </div>
+          <div
+            class="kv-row"
+            style="
+              display: flex;
+              justify-content: space-between;
+              padding: 7px 0;
+              border-bottom: 1px solid rgba(0, 212, 255, 0.05);
+            "
+          >
+            <span
+              style="
+                font-family: var(--mono);
+                font-size: 10px;
+                letter-spacing: 0.5px;
+                color: var(--text-dim);
+                text-transform: uppercase;
+              "
+              >DNS Server</span
+            >
+            <span
+              style="
+                font-family: var(--mono);
+                font-size: 12px;
+                color: var(--text-sec);
+              "
+              >{{ result.dns_server|default:"system" }}</span
+            >
+          </div>
+          <div
+            class="kv-row"
+            style="
+              display: flex;
+              justify-content: space-between;
+              padding: 7px 0;
+            "
+          >
+            <span
+              style="
+                font-family: var(--mono);
+                font-size: 10px;
+                letter-spacing: 0.5px;
+                color: var(--text-dim);
+                text-transform: uppercase;
+              "
+              >Risk Level</span
+            >
+            <span
+              class="risk-{{ result.risk_level }}"
+              style="
+                font-family: var(--mono);
+                font-size: 13px;
+                font-weight: 600;
+              "
+              >{{ result.risk_level }}</span
+            >
+          </div>
+        </div>
+      </div>
+
+      <!-- Domain findings table -->
+      <div class="section-title" style="margin-bottom: 1rem">
+        Domain Query Log
+      </div>
+      <div class="card">
+        <div style="overflow-x: auto; max-height: 500px; overflow-y: auto">
+          <table class="data-table">
+            <thead style="position: sticky; top: 0; z-index: 1">
+              <tr>
+                <th>#</th>
+                <th>Domain</th>
+                <th>Outcome</th>
+                <th>Entropy</th>
+                <th>Time (ms)</th>
+                <th>Timestamp</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for d in domains %}
+              <tr>
+                <td
+                  class="mono"
+                  style="font-size: 10px; color: var(--text-dim)"
+                >
+                  {{ forloop.counter }}
+                </td>
+                <td class="mono" style="font-size: 12px; color: var(--cyan)">
+                  {{ d.domain }}
+                </td>
+                <td>
+                  {% if d.outcome == 'NXDOMAIN' %}
+                  <span class="outcome-nx">NXDOMAIN</span>
+                  {% elif d.outcome == 'RESOLVED' %}
+                  <span class="outcome-ok">RESOLVED</span>
+                  {% elif d.outcome == 'TIMEOUT' %}
+                  <span class="outcome-to">TIMEOUT</span>
+                  {% else %}
+                  <span class="outcome-er">{{ d.outcome }}</span>
+                  {% endif %}
+                </td>
+                <td>
+                  <span class="mono" style="font-size: 11px"
+                    >{{ d.entropy }}</span
+                  >
+                  <span
+                    class="entropy-bar"
+                    style="width:{% widthratio d.entropy 5 60 %}px"
+                  ></span>
+                </td>
+                <td
+                  class="mono"
+                  style="font-size: 11px; color: var(--text-dim)"
+                >
+                  {{ d.response_ms|default:"—" }}
+                </td>
+                <td
+                  class="mono"
+                  style="font-size: 10px; color: var(--text-dim)"
+                >
+                  {{ d.timestamp|slice:"11:19" }}
+                </td>
+              </tr>
+              {% empty %}
+              <tr>
+                <td
+                  colspan="6"
+                  style="
+                    text-align: center;
+                    padding: 2rem;
+                    color: var(--text-dim);
+                    font-family: var(--mono);
+                    font-size: 12px;
+                  "
+                >
+                  No domain data recorded.
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+    <!-- end left column -->
+
+    <!-- Right column -->
+    <div>
+      <!-- Mark IDS detection -->
+      <div class="mark-form" style="margin-bottom: 1rem">
+        <div class="mark-title">
+          <i class="bi bi-shield-exclamation" style="color: var(--cyan)"></i>
+          &nbsp;Mark IDS Result
+        </div>
+        <p
+          style="
+            font-family: var(--mono);
+            font-size: 11px;
+            color: var(--text-sec);
+            margin-bottom: 1rem;
+            line-height: 1.6;
+          "
+        >
+          After checking your IDS dashboard, mark whether this run was detected
+          or evaded.
+        </p>
+        <form
+          method="post"
+          action="{% url 'scanner:dga_mark_detected' result.pk %}"
+        >
+          {% csrf_token %}
+          <div style="margin-bottom: 0.75rem">
+            <label
+              style="
+                font-family: var(--mono);
+                font-size: 10px;
+                letter-spacing: 1px;
+                color: var(--text-dim);
+                text-transform: uppercase;
+                display: block;
+                margin-bottom: 6px;
+              "
+            >
+              Notes (optional)
+            </label>
+            <textarea
+              name="notes"
+              class="notes-input"
+              placeholder="e.g. IDS alert triggered after 12 queries..."
+            >
+{{ result.ids_detection_notes }}</textarea
+            >
+          </div>
+          <div class="mark-btns">
+            <button
+              type="submit"
+              name="detected"
+              value="true"
+              class="btn-detected"
+            >
+              <i class="bi bi-exclamation-triangle"></i> Detected
+            </button>
+            <button
+              type="submit"
+              name="detected"
+              value="false"
+              class="btn-evaded"
+            >
+              <i class="bi bi-shield-check"></i> Evaded
+            </button>
+          </div>
+        </form>
+      </div>
+
+      <!-- IDS detection context -->
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">
+            <i class="bi bi-info-circle"></i> What IDS should see
+          </div>
+        </div>
+        <div
+          style="
+            padding: 1rem;
+            font-family: var(--mono);
+            font-size: 11px;
+            color: var(--text-sec);
+            line-height: 1.8;
+          "
+        >
+          <div
+            style="
+              margin-bottom: 0.5rem;
+              color: var(--text-dim);
+              font-size: 9px;
+              letter-spacing: 1px;
+              text-transform: uppercase;
+            "
+          >
+            Detection signals
+          </div>
+          <div>
+            <span style="color: var(--cyan)">NXDOMAIN ratio:</span> {{
+            result.nxdomain_ratio|floatformat:2 }} {% if result.nxdomain_ratio
+            >= 0.8 %} <span style="color: var(--red)">← very high</span>{% endif
+            %}
+          </div>
+          <div>
+            <span style="color: var(--cyan)">Entropy avg:</span> {{
+            result.avg_entropy }} {% if result.avg_entropy >= 3.5 %}
+            <span style="color: var(--red)">← suspicious</span>{% endif %}
+          </div>
+          <div>
+            <span style="color: var(--cyan)">Burst rate:</span> {{
+            result.rate_per_sec }}/s
+          </div>
+          <div>
+            <span style="color: var(--cyan)">Total queries:</span> {{
+            result.total_queries }}
+          </div>
+          <div
+            style="
+              margin-top: 0.75rem;
+              padding-top: 0.75rem;
+              border-top: 1px solid var(--border);
+              font-size: 10px;
+              color: var(--text-dim);
+            "
+          >
+            IDS threshold: typically triggers on &gt;10 NXDOMAIN in 60s from one
+            host.
+          </div>
+        </div>
+      </div>
+    </div>
+    <!-- end right column -->
+  </div>
+</div>
+{% endblock %}

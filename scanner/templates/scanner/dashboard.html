@@ -1,0 +1,194 @@
+<!-- scanner/templates/scanner/dashboard.html -->
+{% extends "scanner/base.html" %}
+{% block title %}Dashboard{% endblock %}
+
+{% block extra_css %}
+<style>
+.page-header {
+  display: flex; align-items: flex-end; justify-content: space-between;
+  margin-bottom: 1.5rem;
+}
+
+.page-title {
+  font-family: var(--cond); font-size: 24px; font-weight: 700;
+  letter-spacing: 2px; color: var(--text-pri);
+}
+
+.page-meta {
+  font-family: var(--mono); font-size: 10px; color: var(--text-dim);
+  margin-top: 2px; letter-spacing: 1px;
+}
+
+.cache-hit-icon { color: var(--amber); font-size: 12px; }
+
+.empty-state {
+  text-align: center; padding: 5rem 2rem;
+  color: var(--text-dim);
+}
+
+.empty-icon {
+  font-size: 48px; margin-bottom: 1rem;
+  color: var(--border-md);
+}
+
+.empty-text {
+  font-family: var(--mono); font-size: 12px; letter-spacing: 1px;
+  margin-bottom: 1.5rem;
+}
+
+.table-num {
+  font-family: var(--mono); font-size: 11px; color: var(--text-dim);
+}
+
+.target-cell {
+  font-family: var(--mono); font-size: 13px; color: var(--cyan);
+}
+
+.spinner-dot {
+  display: inline-block; width: 6px; height: 6px; border-radius: 50%;
+  background: var(--amber); margin-right: 6px;
+  animation: blink 1s ease-in-out infinite;
+}
+
+.action-link {
+  font-family: var(--mono); font-size: 11px; letter-spacing: .5px;
+  color: var(--text-dim); text-decoration: none; padding: 4px 10px;
+  border: 1px solid var(--border); border-radius: 3px;
+  transition: all .15s;
+}
+
+.action-link:hover { color: var(--cyan); border-color: var(--cyan); background: var(--cyan-glow); }
+
+.action-link.report { color: var(--cyan-dim); border-color: rgba(0,180,210,.3); }
+.action-link.report:hover { color: var(--cyan); border-color: var(--cyan); background: var(--cyan-glow); }
+
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <div class="page-title">Threat Overview</div>
+    <div class="page-meta">SCAN HISTORY &nbsp;·&nbsp; {{ total_scans }} TOTAL RECORDS</div>
+  </div>
+  <a href="{% url 'scanner:submit_scan' %}" class="btn btn-primary">
+    <i class="bi bi-plus-circle"></i> New Scan
+  </a>
+</div>
+
+<!-- Stat cards -->
+<div class="stat-grid">
+  <div class="stat-card">
+    <div class="stat-label">Total Scans</div>
+    <div class="stat-value">{{ total_scans }}</div>
+  </div>
+  <div class="stat-card danger">
+    <div class="stat-label">High Risk Found</div>
+    <div class="stat-value risk-HIGH">{{ high_risk }}</div>
+  </div>
+  <div class="stat-card warning">
+    <div class="stat-label">Active / Running</div>
+    <div class="stat-value" style="color:var(--amber)">{{ running }}</div>
+  </div>
+  <div class="stat-card info">
+    <div class="stat-label">Cache Hits Saved</div>
+    <div class="stat-value" style="color:var(--blue)">{{ cache_hits }}</div>
+  </div>
+</div>
+
+<!-- Scan history -->
+<div class="section-header">
+  <div class="section-title">Recent Scans</div>
+</div>
+
+<div class="card">
+  {% if scans %}
+  <div style="overflow-x:auto">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Target</th>
+          <th>Profile</th>
+          <th>Status</th>
+          <th>Risk</th>
+          <th>Hosts</th>
+          <th>Open Ports</th>
+          <th>HIGH / MED</th>
+          <th>Cache</th>
+          <th>Time</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for scan in scans %}
+        <tr>
+          <td class="table-num">{{ scan.pk }}</td>
+          <td class="target-cell">{{ scan.target }}</td>
+          <td>
+            <span class="sev sev-INFO" style="font-size:9px;letter-spacing:.5px">
+              {{ scan.get_scan_profile_display }}
+            </span>
+          </td>
+          <td>
+            {% if scan.status == 'complete' %}
+              <span class="status-badge status-complete">complete</span>
+            {% elif scan.status == 'cached' %}
+              <span class="status-badge status-cached">cached</span>
+            {% elif scan.status == 'running' %}
+              <span class="status-badge status-running">
+                <span class="spinner-dot"></span>running
+              </span>
+            {% elif scan.status == 'failed' %}
+              <span class="status-badge status-failed">failed</span>
+            {% else %}
+              <span class="status-badge status-pending">{{ scan.status }}</span>
+            {% endif %}
+          </td>
+          <td>
+            <span class="risk-{{ scan.overall_risk }}" style="font-family:var(--mono);font-size:12px;font-weight:600">
+              {{ scan.overall_risk }}
+            </span>
+          </td>
+          <td class="table-num">{{ scan.hosts_up }}/{{ scan.total_hosts }}</td>
+          <td class="table-num">{{ scan.total_open_ports }}</td>
+          <td>
+            <span class="risk-HIGH" style="font-family:var(--mono);font-size:11px">{{ scan.high_severity_count }}</span>
+            <span style="color:var(--text-dim);font-family:var(--mono);font-size:11px"> / </span>
+            <span class="risk-MEDIUM" style="font-family:var(--mono);font-size:11px">{{ scan.medium_severity_count }}</span>
+          </td>
+          <td>
+            {% if scan.cache_hit %}
+              <i class="bi bi-lightning-fill cache-hit-icon" title="Result served from cache"></i>
+            {% else %}
+              <span style="color:var(--border-md)">—</span>
+            {% endif %}
+          </td>
+          <td class="table-num">{{ scan.created_at|timesince }} ago</td>
+          <td>
+            {% if scan.status == 'complete' or scan.status == 'cached' %}
+              <a href="{% url 'scanner:scan_report' scan.pk %}" class="action-link report">
+                Report →
+              </a>
+            {% elif scan.status == 'running' or scan.status == 'pending' %}
+              <a href="{% url 'scanner:scan_status' scan.pk %}" class="action-link">
+                View →
+              </a>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="empty-state">
+    <div class="empty-icon"><i class="bi bi-radar"></i></div>
+    <div class="empty-text">NO SCAN RECORDS FOUND</div>
+    <a href="{% url 'scanner:submit_scan' %}" class="btn btn-primary">
+      <i class="bi bi-play"></i> Run First Scan
+    </a>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

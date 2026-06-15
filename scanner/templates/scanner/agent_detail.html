@@ -1,0 +1,589 @@
+<!-- scanner/templates/scanner/agent_detail.html -->
+{% extends "scanner/base.html" %} {% block title %}Agent — {{ agent.agent_id
+}}{% endblock %} {% block extra_css %}
+<style>
+  .pg-eyebrow {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 2px;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    margin-bottom: 6px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .pg-eyebrow::before {
+    content: "";
+    width: 24px;
+    height: 1px;
+    background: var(--cyan-dim);
+  }
+  .pg-title {
+    font-family: var(--cond);
+    font-size: 24px;
+    font-weight: 700;
+    letter-spacing: 2px;
+  }
+
+  .detail-grid {
+    display: grid;
+    grid-template-columns: 1fr 320px;
+    gap: 1.5rem;
+    align-items: start;
+  }
+  @media (max-width: 760px) {
+    .detail-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  .info-card {
+    background: var(--bg-panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+    margin-bottom: 1rem;
+  }
+  .ic-hd {
+    background: var(--bg-raised);
+    border-bottom: 1px solid var(--border);
+    padding: 0.75rem 1.25rem;
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .ic-hd i {
+    color: var(--cyan);
+    font-size: 12px;
+  }
+  .ic-body {
+    padding: 1.25rem;
+  }
+
+  .kv-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 7px 0;
+    border-bottom: 1px solid rgba(0, 212, 255, 0.05);
+  }
+  .kv-row:last-child {
+    border-bottom: none;
+  }
+  .kv-k {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.5px;
+    color: var(--text-dim);
+    text-transform: uppercase;
+  }
+  .kv-v {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--text-pri);
+    text-align: right;
+    max-width: 60%;
+    word-break: break-all;
+  }
+  .kv-v.mono-val {
+    font-size: 11px;
+    color: var(--cyan);
+  }
+  .kv-v.online {
+    color: var(--green);
+  }
+  .kv-v.offline {
+    color: var(--text-dim);
+  }
+  .kv-v.inactive {
+    color: var(--red);
+  }
+
+  .token-box {
+    background: var(--bg-deep);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 0.875rem 1rem;
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--cyan);
+    word-break: break-all;
+    cursor: pointer;
+    transition: border-color 0.15s;
+    position: relative;
+  }
+  .token-box:hover {
+    border-color: var(--cyan);
+  }
+  .token-lbl {
+    font-family: var(--mono);
+    font-size: 9px;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    margin-bottom: 6px;
+  }
+  .copy-pill {
+    position: absolute;
+    right: 8px;
+    top: 8px;
+    font-size: 10px;
+    color: var(--text-dim);
+    background: var(--bg-raised);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    padding: 2px 6px;
+  }
+
+  .stat-row {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+  }
+  .stat-mini {
+    background: var(--bg-panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 1rem;
+    text-align: center;
+  }
+  .sm-val {
+    font-family: var(--cond);
+    font-size: 26px;
+    font-weight: 700;
+    color: var(--text-pri);
+  }
+  .sm-lbl {
+    font-family: var(--mono);
+    font-size: 9px;
+    letter-spacing: 1px;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    margin-top: 2px;
+  }
+
+  .act-btn {
+    font-family: var(--cond);
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    padding: 8px 16px;
+    border-radius: 4px;
+    cursor: pointer;
+    border: 1px solid;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    transition: all 0.2s;
+    text-decoration: none;
+    width: 100%;
+    justify-content: center;
+    margin-bottom: 0.5rem;
+  }
+  .act-btn.danger {
+    color: var(--red);
+    border-color: rgba(255, 68, 85, 0.3);
+    background: transparent;
+  }
+  .act-btn.danger:hover {
+    background: rgba(255, 68, 85, 0.1);
+    border-color: var(--red);
+  }
+  .act-btn.warn {
+    color: var(--amber);
+    border-color: rgba(255, 170, 0, 0.3);
+    background: transparent;
+  }
+  .act-btn.warn:hover {
+    background: rgba(255, 170, 0, 0.08);
+    border-color: var(--amber);
+  }
+  .act-btn.ok {
+    color: var(--green);
+    border-color: rgba(0, 255, 136, 0.3);
+    background: transparent;
+  }
+  .act-btn.ok:hover {
+    background: rgba(0, 255, 136, 0.06);
+    border-color: var(--green);
+  }
+
+  .pulse-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    display: inline-block;
+    margin-right: 6px;
+  }
+  .pd-on {
+    background: var(--green);
+    box-shadow: 0 0 8px var(--green);
+    animation: blink 2s ease-in-out infinite;
+  }
+  .pd-off {
+    background: var(--text-dim);
+  }
+</style>
+{% endblock %} {% block content %}
+<div style="max-width: 960px">
+  <div
+    style="
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      margin-bottom: 1.5rem;
+      flex-wrap: wrap;
+      gap: 1rem;
+    "
+  >
+    <div>
+      <div class="pg-eyebrow">Agent Detail</div>
+      <div
+        style="
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          margin-bottom: 4px;
+        "
+      >
+        <span
+          class="pulse-dot {% if agent.is_online %}pd-on{% else %}pd-off{% endif %}"
+        ></span>
+        <div class="pg-title">{{ agent.agent_id }}</div>
+      </div>
+      <div
+        style="
+          font-family: var(--mono);
+          font-size: 11px;
+          color: var(--text-dim);
+        "
+      >
+        {{ agent.name|default:"No display name" }}
+      </div>
+    </div>
+    <a href="{% url 'scanner:agent_list' %}" class="btn btn-outline">
+      <i class="bi bi-arrow-left"></i> All Agents
+    </a>
+  </div>
+
+  <!-- Stats row -->
+  <div class="stat-row">
+    <div class="stat-mini">
+      <div class="sm-val">{{ agent.total_requests }}</div>
+      <div class="sm-lbl">Total Requests</div>
+    </div>
+    <div class="stat-mini">
+      <div class="sm-val">{{ recent_scans|length }}</div>
+      <div class="sm-lbl">Recent Scans</div>
+    </div>
+    <div class="stat-mini">
+      <div
+        class="sm-val"
+        style="font-size:14px;{% if agent.is_active %}color:var(--green){% else %}color:var(--red){% endif %}"
+      >
+        {% if agent.is_active %}ACTIVE{% else %}DISABLED{% endif %}
+      </div>
+      <div class="sm-lbl">Status</div>
+    </div>
+  </div>
+
+  <div class="detail-grid">
+    <!-- LEFT column -->
+    <div>
+      <!-- Identity card -->
+      <div class="info-card">
+        <div class="ic-hd">
+          <i class="bi bi-fingerprint"></i> Agent Identity
+        </div>
+        <div class="ic-body">
+          <div class="kv-row">
+            <span class="kv-k">Agent ID</span>
+            <span class="kv-v mono-val">{{ agent.agent_id }}</span>
+          </div>
+          <div class="kv-row">
+            <span class="kv-k">Display Name</span>
+            <span class="kv-v">{{ agent.name|default:"—" }}</span>
+          </div>
+          <div class="kv-row">
+            <span class="kv-k">Status</span>
+            <span
+              class="kv-v {% if not agent.is_active %}inactive{% elif agent.is_online %}online{% else %}offline{% endif %}"
+            >
+              {% if not agent.is_active %}DISABLED {% elif agent.is_online
+              %}ONLINE {% else %}OFFLINE{% endif %}
+            </span>
+          </div>
+          <div class="kv-row">
+            <span class="kv-k">Registered</span>
+            <span class="kv-v">{{ agent.registered_at|date:"Y-m-d H:i" }}</span>
+          </div>
+          <div class="kv-row">
+            <span class="kv-k">Last Seen</span>
+            <span class="kv-v">
+              {% if agent.last_seen_at %}{{ agent.last_seen_at|timesince }}
+              ago{% else %}Never{% endif %}
+            </span>
+          </div>
+          <div class="kv-row">
+            <span class="kv-k">Last IP</span>
+            <span class="kv-v mono-val"
+              >{{ agent.last_seen_ip|default:"—" }}</span
+            >
+          </div>
+          <div class="kv-row">
+            <span class="kv-k">Total Requests</span>
+            <span class="kv-v">{{ agent.total_requests }}</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Auth token (masked) -->
+      <div class="info-card">
+        <div class="ic-hd"><i class="bi bi-key"></i> Authentication Token</div>
+        <div class="ic-body">
+          <div class="token-lbl">Auth Token (send in Authorization header)</div>
+          <div
+            class="token-box"
+            onclick="copyToken('{{ agent.auth_token }}', this)"
+          >
+            {{ agent.auth_token|slice:":16"
+            }}••••••••••••••••••••••••••••••••••••••••••••••••
+            <span class="copy-pill"><i class="bi bi-clipboard"></i></span>
+          </div>
+          <div
+            style="
+              font-family: var(--mono);
+              font-size: 10px;
+              color: var(--text-dim);
+              margin-top: 8px;
+            "
+          >
+            Click to copy full token. The secret key is not shown after
+            registration.
+          </div>
+        </div>
+      </div>
+
+      <!-- Recent scans -->
+      {% if recent_scans %}
+      <div class="info-card">
+        <div class="ic-hd">
+          <i class="bi bi-clock-history"></i> Recent Activity
+        </div>
+        <div style="overflow-x: auto">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Target</th>
+                <th>Profile</th>
+                <th>Risk</th>
+                <th>When</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for scan in recent_scans %}
+              <tr>
+                <td
+                  class="mono"
+                  style="font-size: 11px; color: var(--text-dim)"
+                >
+                  {{ scan.pk }}
+                </td>
+                <td class="mono" style="font-size: 12px; color: var(--cyan)">
+                  {{ scan.target }}
+                </td>
+                <td>
+                  <span class="sev sev-INFO" style="font-size: 9px"
+                    >{{ scan.get_scan_profile_display }}</span
+                  >
+                </td>
+                <td>
+                  <span
+                    class="risk-{{ scan.overall_risk }}"
+                    style="
+                      font-family: var(--mono);
+                      font-size: 11px;
+                      font-weight: 600;
+                    "
+                    >{{ scan.overall_risk }}</span
+                  >
+                </td>
+                <td
+                  class="mono"
+                  style="font-size: 10px; color: var(--text-dim)"
+                >
+                  {{ scan.created_at|timesince }} ago
+                </td>
+                <td>
+                  {% if scan.status == 'complete' %}
+                  <a
+                    href="{% url 'scanner:scan_report' scan.pk %}"
+                    style="
+                      font-family: var(--mono);
+                      font-size: 10px;
+                      color: var(--cyan-dim);
+                    "
+                    >Report →</a
+                  >
+                  {% endif %}
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+      {% endif %}
+    </div>
+
+    <!-- RIGHT column -->
+    <div>
+      <!-- Actions -->
+      <div class="info-card" style="margin-bottom: 1rem">
+        <div class="ic-hd"><i class="bi bi-lightning"></i> Actions</div>
+        <div class="ic-body">
+          <form
+            method="post"
+            action="{% url 'scanner:agent_toggle' agent.pk %}"
+          >
+            {% csrf_token %} {% if agent.is_active %}
+            <button type="submit" class="act-btn warn">
+              <i class="bi bi-pause-fill"></i> Disable Agent
+            </button>
+            {% else %}
+            <button type="submit" class="act-btn ok">
+              <i class="bi bi-play-fill"></i> Enable Agent
+            </button>
+            {% endif %}
+          </form>
+          <form
+            method="post"
+            action="{% url 'scanner:agent_delete' agent.pk %}"
+            onsubmit="return confirm('Delete agent {{ agent.agent_id }}? This cannot be undone.')"
+          >
+            {% csrf_token %}
+            <button type="submit" class="act-btn danger">
+              <i class="bi bi-trash"></i> Delete Agent
+            </button>
+          </form>
+        </div>
+      </div>
+
+      <!-- How to use card -->
+      <div class="info-card">
+        <div class="ic-hd"><i class="bi bi-terminal"></i> How to use</div>
+        <div
+          class="ic-body"
+          style="
+            font-family: var(--mono);
+            font-size: 11px;
+            color: var(--text-sec);
+            line-height: 2;
+          "
+        >
+          <div
+            style="
+              color: var(--text-dim);
+              font-size: 9px;
+              letter-spacing: 1px;
+              text-transform: uppercase;
+              margin-bottom: 0.5rem;
+            "
+          >
+            Run on endpoint machine
+          </div>
+          <div style="color: var(--text-dim)"># Start persistent agent:</div>
+          <div style="color: var(--cyan)">python agent.py</div>
+          <div style="color: var(--text-dim); margin-top: 0.25rem">
+            # Single scan:
+          </div>
+          <div style="color: var(--cyan)">
+            python agent.py --scan<br /><span style="color: var(--amber)">
+              {{ agent.agent_id|slice:":20" }}.. --profile fast</span
+            >
+          </div>
+          <div style="color: var(--text-dim); margin-top: 0.25rem">
+            # Check connection:
+          </div>
+          <div style="color: var(--cyan)">python agent.py --ping</div>
+        </div>
+      </div>
+
+      <!-- Connection check -->
+      <div class="info-card">
+        <div class="ic-hd"><i class="bi bi-activity"></i> Live Status</div>
+        <div class="ic-body" style="text-align: center; padding: 1.5rem">
+          {% if agent.is_online %}
+          <div style="font-size: 32px; margin-bottom: 0.5rem">
+            <i class="bi bi-check-circle-fill" style="color: var(--green)"></i>
+          </div>
+          <div
+            style="
+              font-family: var(--mono);
+              font-size: 12px;
+              color: var(--green);
+            "
+          >
+            Connected
+          </div>
+          <div
+            style="
+              font-family: var(--mono);
+              font-size: 10px;
+              color: var(--text-dim);
+              margin-top: 4px;
+            "
+          >
+            Last heartbeat {{ agent.last_seen_at|timesince }} ago
+          </div>
+          {% else %}
+          <div style="font-size: 32px; margin-bottom: 0.5rem">
+            <i class="bi bi-wifi-off" style="color: var(--text-dim)"></i>
+          </div>
+          <div
+            style="
+              font-family: var(--mono);
+              font-size: 12px;
+              color: var(--text-dim);
+            "
+          >
+            {% if agent.last_seen_at %}Not connected{% else %}Never connected{%
+            endif %}
+          </div>
+          <div
+            style="
+              font-family: var(--mono);
+              font-size: 10px;
+              color: var(--text-dim);
+              margin-top: 4px;
+            "
+          >
+            Start agent.py on the endpoint
+          </div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %} 
+{% blockextra_js %}
+<script>
+  function copyToken(token, el) {
+    navigator.clipboard.writeText(token).then(() => {
+      el.style.borderColor = "var(--green)";
+      setTimeout(() => (el.style.borderColor = ""), 1500);
+    });
+  }
+</script>
+{% endblock %}

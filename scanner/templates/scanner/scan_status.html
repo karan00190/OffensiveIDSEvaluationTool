@@ -1,0 +1,276 @@
+<!-- scanner/templates/scanner/scan_status.html -->
+{% extends "scanner/base.html" %}
+{% block title %}Scanning...{% endblock %}
+
+{% block extra_css %}
+<style>
+.status-wrap {
+  min-height: calc(100vh - 120px);
+  display: flex; align-items: center; justify-content: center;
+}
+
+.status-panel {
+  width: 100%; max-width: 560px; text-align: center;
+  animation: emerge .4s ease;
+}
+
+@keyframes emerge {
+  from { opacity:0; transform:translateY(16px); }
+}
+
+/* Radar animation */
+.radar-ring {
+  position: relative;
+  width: 160px; height: 160px;
+  margin: 0 auto 2rem;
+}
+
+.radar-base {
+  width: 160px; height: 160px; border-radius: 50%;
+  border: 1px solid var(--border-md);
+  position: absolute; inset: 0;
+  display: flex; align-items: center; justify-content: center;
+}
+
+.radar-base::before, .radar-base::after {
+  content: '';
+  position: absolute; border-radius: 50%;
+  border: 1px solid var(--border);
+}
+
+.radar-base::before { width: 110px; height: 110px; }
+.radar-base::after  { width: 60px;  height: 60px;  }
+
+.radar-sweep {
+  position: absolute; inset: 0; border-radius: 50%;
+  background: conic-gradient(
+    from 0deg,
+    transparent 0deg,
+    rgba(0,212,255,.15) 30deg,
+    rgba(0,212,255,.35) 60deg,
+    transparent 60deg
+  );
+  animation: sweep 2s linear infinite;
+}
+
+@keyframes sweep { to { transform: rotate(360deg); } }
+
+.radar-center {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: var(--cyan);
+  box-shadow: 0 0 12px var(--cyan);
+  animation: blink 1s ease-in-out infinite;
+  position: relative; z-index: 1;
+}
+
+/* Crosshair lines */
+.radar-lines {
+  position: absolute; inset: 0;
+}
+
+.radar-lines::before, .radar-lines::after {
+  content: '';
+  position: absolute; background: var(--border);
+}
+
+.radar-lines::before {
+  width: 1px; height: 100%;
+  left: 50%; transform: translateX(-50%);
+}
+
+.radar-lines::after {
+  height: 1px; width: 100%;
+  top: 50%; transform: translateY(-50%);
+}
+
+.status-target {
+  font-family: var(--mono); font-size: 18px;
+  color: var(--cyan); margin-bottom: .5rem;
+  letter-spacing: 1px;
+}
+
+.status-profile {
+  font-family: var(--mono); font-size: 11px;
+  color: var(--text-dim); letter-spacing: 1.5px;
+  text-transform: uppercase; margin-bottom: 2rem;
+}
+
+.status-msg-box {
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: 8px; padding: 1rem 1.25rem;
+  margin-bottom: 1.5rem;
+  font-family: var(--mono); font-size: 12px;
+  color: var(--text-sec); letter-spacing: .5px;
+  min-height: 48px; display: flex; align-items: center;
+  justify-content: center; gap: 10px;
+  transition: all .3s;
+}
+
+.status-msg-box.complete {
+  border-color: rgba(0,255,136,.3);
+  background: rgba(0,255,136,.05);
+  color: var(--green);
+}
+
+.status-msg-box.failed {
+  border-color: rgba(255,68,85,.3);
+  background: rgba(255,68,85,.05);
+  color: var(--red);
+}
+
+.elapsed-bar {
+  display: flex; justify-content: space-between; align-items: center;
+  font-family: var(--mono); font-size: 10px; color: var(--text-dim);
+  letter-spacing: 1px; margin-bottom: 1.5rem;
+}
+
+.progress-track {
+  flex: 1; height: 2px;
+  background: var(--border); border-radius: 1px;
+  margin: 0 12px; overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%; background: var(--cyan);
+  border-radius: 1px; width: 0%;
+  animation: progress-grow 30s ease-out forwards;
+  box-shadow: 0 0 6px var(--cyan);
+}
+
+@keyframes progress-grow { to { width: 95%; } }
+
+.log-panel {
+  background: var(--bg-deep);
+  border: 1px solid var(--border);
+  border-radius: 6px; padding: 1rem;
+  font-family: var(--mono); font-size: 11px;
+  color: var(--text-dim); text-align: left;
+  height: 80px; overflow: hidden;
+  position: relative;
+}
+
+.log-line {
+  line-height: 1.8; opacity: 0;
+  animation: log-appear .3s ease forwards;
+}
+
+@keyframes log-appear { to { opacity: 1; } }
+
+.log-prefix { color: var(--cyan-dim); margin-right: 8px; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="status-wrap">
+  <div class="status-panel">
+
+    <div class="radar-ring" id="radar-ring">
+      <div class="radar-base">
+        <div class="radar-lines"></div>
+        <div class="radar-center"></div>
+      </div>
+      <div class="radar-sweep" id="radar-sweep"></div>
+    </div>
+
+    <div class="status-target">{{ scan.target }}</div>
+    <div class="status-profile">{{ scan.get_scan_profile_display }} &nbsp;·&nbsp; Scan #{{ scan.pk }}</div>
+
+    <div class="status-msg-box" id="msg-box">
+      <i class="bi bi-hourglass-split" id="msg-icon"></i>
+      <span id="msg-text">Initializing scan engine...</span>
+    </div>
+
+    <div class="elapsed-bar">
+      <span>00:00</span>
+      <div class="progress-track">
+        <div class="progress-fill" id="progress-fill"></div>
+      </div>
+      <span id="elapsed-display">00:00</span>
+    </div>
+
+    <div class="log-panel" id="log-panel">
+      <div class="log-line" style="animation-delay:.1s">
+        <span class="log-prefix">[INIT]</span> Scan task queued for {{ scan.target }}
+      </div>
+    </div>
+
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const POLL_URL   = "{{ poll_url }}";
+const REPORT_URL = "{{ report_url }}";
+let elapsed = 0;
+let pollInterval;
+const logPanel = document.getElementById('log-panel');
+
+function pad(n) { return String(n).padStart(2,'0'); }
+function formatTime(s) { return `${pad(Math.floor(s/60))}:${pad(s%60)}`; }
+
+function addLog(prefix, msg, color) {
+  const div = document.createElement('div');
+  div.className = 'log-line';
+  div.innerHTML = `<span class="log-prefix" style="color:${color||'var(--cyan-dim)'}">[${prefix}]</span> ${msg}`;
+  logPanel.appendChild(div);
+  logPanel.scrollTop = logPanel.scrollHeight;
+  while (logPanel.children.length > 5) logPanel.removeChild(logPanel.firstChild);
+}
+
+// Elapsed timer
+setInterval(() => {
+  elapsed++;
+  document.getElementById('elapsed-display').textContent = formatTime(elapsed);
+}, 1000);
+
+// Poll every 2 seconds
+pollInterval = setInterval(async () => {
+  try {
+    const resp = await fetch(POLL_URL);
+    const data = await resp.json();
+    document.getElementById('msg-text').textContent = data.progress;
+
+    if (data.status === 'running') {
+      addLog('SCAN', data.progress, 'var(--cyan-dim)');
+    }
+
+    if (data.complete) {
+      clearInterval(pollInterval);
+
+      // Stop radar
+      document.getElementById('radar-sweep').style.animationPlayState = 'paused';
+      document.querySelector('.radar-center').style.background = 'var(--green)';
+      document.querySelector('.radar-center').style.boxShadow = '0 0 12px var(--green)';
+
+      const box = document.getElementById('msg-box');
+      box.classList.add('complete');
+      document.getElementById('msg-icon').className = 'bi bi-check-circle-fill';
+      document.getElementById('progress-fill').style.width = '100%';
+      document.getElementById('progress-fill').style.background = 'var(--green)';
+      document.getElementById('progress-fill').style.boxShadow = '0 0 6px var(--green)';
+      document.getElementById('progress-fill').style.animation = 'none';
+
+      addLog('DONE', `Scan complete — Risk: ${data.overall_risk}`, 'var(--green)');
+      setTimeout(() => { window.location.href = REPORT_URL; }, 1500);
+    }
+
+    if (data.failed) {
+      clearInterval(pollInterval);
+      document.getElementById('radar-sweep').style.animationPlayState = 'paused';
+      document.getElementById('msg-box').classList.add('failed');
+      document.getElementById('msg-icon').className = 'bi bi-x-circle-fill';
+      addLog('ERR', data.progress, 'var(--red)');
+    }
+
+  } catch(e) {
+    addLog('WARN', 'Connection retry...', 'var(--amber)');
+  }
+}, 2000);
+
+// Initial fake log activity
+setTimeout(() => addLog('INFO', 'Worker process assigned', 'var(--cyan-dim)'), 800);
+setTimeout(() => addLog('SCAN', `Running nmap against {{ scan.target }}`, 'var(--cyan-dim)'), 2000);
+</script>
+{% endblock %}
