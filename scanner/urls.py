@@ -9,6 +9,7 @@ from . import (
     dga_views,
     exfil_views,
     module_views,
+    payload_views,
 )
 
 app_name = 'scanner'
@@ -150,4 +151,29 @@ urlpatterns = [
     path('api/agent/exfil/results/',
          exfil_views.api_exfil_results,
          name='api_exfil_results'),
+
+    # ── Pull-Model Payload Management (browser) ───────────────────────────────
+    path('modules/payloads/',
+         payload_views.payload_manager_view,
+         name='payload_manager'),
+
+    path('modules/payloads/upload/',
+         payload_views.upload_payload,
+         name='payload_upload'),
+
+    # ── Pull-Model Payload API (browser AJAX) ─────────────────────────────────
+    path('api/modules/payloads/',
+         payload_views.list_payloads,
+         name='api_list_payloads'),
+
+    path('api/modules/payloads/<int:payload_id>/delete/',
+         payload_views.delete_payload,
+         name='api_delete_payload'),
+
+    # ── Pull-Model Payload Download (agent-authenticated) ─────────────────────
+    # Agent fetches raw binary here after receiving the download URL via WS.
+    # Auth: AgentAuthentication (mTLS + JWT + HMAC) — not login_required.
+    path('api/agent/payload/<int:payload_id>/download/',
+         payload_views.payload_download,
+         name='api_payload_download'),
 ]

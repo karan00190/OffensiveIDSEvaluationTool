@@ -70,6 +70,11 @@ class ExfilProfile(models.TextChoices):
     JITTER    = 'jitter',    'Jitter'
 
 
+class PayloadSource(models.TextChoices):
+    GENERATED = 'generated', 'Machine Generated'
+    MANUAL    = 'manual',    'Admin Upload'
+
+
 class ModuleChoice(models.TextChoices):
     """
     The three attack modules that can be dispatched from the web UI.
@@ -170,15 +175,6 @@ class Agent(models.Model):
             return False
         return (timezone.now() - self.last_seen_at).seconds < 90
 
-    @property
-    def is_authenticated(self) -> bool:
-        """
-        Always return True. This mimics Django's AbstractBaseUser / User 
-        interface so that Django Rest Framework (DRF) permission classes 
-        do not crash when an API request is authenticated as an Agent.
-        """
-        return True
-    
     def __str__(self):
         return f"Agent '{self.agent_id}' [{'active' if self.is_active else 'disabled'}]"
 
@@ -625,3 +621,94 @@ class ModuleTask(models.Model):
             # Agent detail page looks up all tasks for one agent ordered by time
             models.Index(fields=['agent', 'dispatched_at'], name='idx_moduletask_agent_time'),
         ]
+
+
+# =============================================================================
+# MODEL 8: EXFIL PAYLOAD
+# Stores either a payload configuration (generated mode) or a reference to
+# an admin-uploaded file (manual pull mode).
+# =============================================================================
+
+class ExfilPayload(models.Model):
+    """
+    WHY THIS EXISTS:
+    The pull-model exfiltration feature requires the agent to know WHERE to
+    fetch payload bytes from, not what those bytes are.  This model stores
+    either a template key (for machine-generated payloads) or a reference
+    to an admin-uploaded file.  The agent receives only the metadata (URL +
+    checksum) over the WebSocket command channel; actual bytes travel over a
+    separate authenticated HTTP download endpoint, never through Channels.
+    """
+
+    name        = models.CharField(
+        max_length = 128,
+        help_text  = 'Human-readable label shown in the payload dropdown.',
+    )
+    source_type = models.CharField(
+        max_length = 12,
+        choices    = PayloadSource.choices,
+        default    = PayloadSource.GENERATED,
+        db_index   = True,
+    )
+    created_by  = models.ForeignKey(
+        'auth.User',
+        on_delete = models.SET_NULL,
+        null=True, blank=True,
+        related_name = 'exfil_payloads',
+    )
+    created_at  = models.DateTimeField(auto_now_add=True)
+    expires_at  = models.DateTimeField(
+        null=True, blank=True,
+        help_text='Null = never expires.  Set for manual uploads (default 24 h).',
+    )
+
+    # ── Generated mode ────────────────────────────────────────────────────────
+    payload_type = models.CharField(
+        max_length = 32,
+        blank      = True,
+        default    = 'credentials',
+        help_text  = 'Template key: credentials / pii / api_key / db_dump / config',
+    )
+
+    # ── Manual upload mode ────────────────────────────────────────────────────
+    # Stored outside the web root (MEDIA_ROOT).  Never served directly via nginx.
+    uploaded_file   = models.FileField(
+        upload_to = 'exfil_payloads/%Y/%m/',
+        blank     = True,
+    )
+    file_size       = models.IntegerField(default=0, help_text='Bytes.')
+    checksum_sha256 = models.CharField(
+        max_length = 64,
+        blank      = True,
+        help_text  = 'Hex digest of SHA-256 of uploaded_file contents.',
+    )
+
+    # ── Computed properties ───────────────────────────────────────────────────
+
+    @property
+    def is_expired(self) -> bool:
+        if not self.expires_at:
+            return False
+        return timezone.now() > self.expires_at
+
+    @property
+    def checksum_short(self) -> str:
+        return (self.checksum_sha256[:16] + '…') if self.checksum_sha256 else '—'
+
+    @property
+    def size_display(self) -> str:
+        if self.file_size == 0:
+            return '—'
+        if self.file_size < 1024:
+            return f'{self.file_size} B'
+        if self.file_size < 1024 * 1024:
+            return f'{self.file_size / 1024:.1f} KB'
+        return f'{self.file_size / (1024 * 1024):.1f} MB'
+
+    def __str__(self) -> str:
+        return f"ExfilPayload #{self.pk} '{self.name}' [{self.source_type}]"
+
+    class Meta:
+        ordering            = ['-created_at']
+        verbose_name        = 'Exfil Payload'
+        verbose_name_plural = 'Exfil Payloads'

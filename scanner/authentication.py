@@ -1,193 +1,86 @@
 # scanner/authentication.py
-# =============================================================================
-#  MIAT — Final Authentication Class
-#  Combines JWT (identity + expiry) + HMAC (body integrity) in one class.
-#
-#  This REPLACES the old authentication.py completely.
-#  Every authenticated API request must pass BOTH checks:
-#
-#    Check 1 — JWT Bearer token
-#      Proves:  "I am agent barc-lab-01 and my session is valid"
-#      Fails:   if token expired, tampered, or signed by wrong key
-#
-#    Check 2 — HMAC-SHA256 signature
-#      Proves:  "This exact request body was sent by the real agent"
-#      Fails:   if body was modified in transit or timestamp is stale
-#
-#  Header requirements on every request:
-#    Authorization: Bearer <jwt_access_token>
-#    X-Timestamp:   <unix_timestamp_float>
-#    X-Signature:   <hmac_sha256_hex(secret_key, "timestamp:body")>
-# =============================================================================
-
-import time
-import hmac
-import hashlib
-import logging
-from pathlib import Path
-
-from django.conf import settings
+import hashlib, hmac, logging, time
 from rest_framework.authentication import BaseAuthentication
 from rest_framework.exceptions     import AuthenticationFailed
+from .jwt_auth                     import verify_token
+from .models                       import Agent
 
-from .models import Agent
+logger = logging.getLogger('MIAT.Auth')
 
-logger = logging.getLogger(__name__)
-
-TIMESTAMP_TOLERANCE = 300   # 5 minutes — reject requests older than this
+REPLAY_WINDOW = 300   # seconds — reject requests older than 5 minutes
 
 
-def _load_public_key() -> str:
-    """
-    Load the RSA public key used to verify JWT signatures.
-    This key can ONLY verify — it cannot sign new tokens.
-    Path set in settings.py as JWT_PUBLIC_KEY_PATH.
-    """
-    key_path = getattr(settings, 'JWT_PUBLIC_KEY_PATH', 'certs/server_pub.key')
-    path = Path(key_path)
-    if not path.exists():
-        raise RuntimeError(
-            f"JWT public key not found at '{key_path}'.\n"
-            f"Run: openssl x509 -pubkey -noout -in certs/server.crt > certs/server_pub.key\n"
-            f"Then set JWT_PUBLIC_KEY_PATH in settings.py"
-        )
-    return path.read_text()
+class _AgentProxy:
+    """Lightweight stand-in for request.user so DRF permission checks work."""
+    def __init__(self, agent: Agent):
+        self._agent      = agent
+        self.agent_id    = agent.agent_id
+        self.is_active   = agent.is_active
+        self.is_anonymous= False
+
+    def __getattr__(self, name):
+        return getattr(self._agent, name)
 
 
 class AgentAuthentication(BaseAuthentication):
     """
-    Final DRF authentication class combining JWT + HMAC.
+    Triple-layer authentication for agent-facing API endpoints:
+      1. JWT Bearer token — verifies agent identity, 15-min expiry
+      2. X-Timestamp header — validates request recency (replay window)
+      3. X-Signature header — HMAC-SHA256 of f'{timestamp}:{body}' using
+         the agent's per-row secret_key
 
-    Use on any agent-facing API view:
-
-        @api_view(['POST'])
-        @authentication_classes([AgentAuthentication])
-        @permission_classes([IsAuthenticated])
-        def my_view(request):
-            agent = request.user   # authenticated Agent object
+    All three must pass.  Failure on any layer raises AuthenticationFailed.
     """
 
     def authenticate(self, request):
-        # ── Check 1: JWT Bearer token ─────────────────────────────────────────
+        # ── 1. JWT ────────────────────────────────────────────────────────────
         auth_header = request.headers.get('Authorization', '')
-
-        if not auth_header:
-            return None    # no auth attempted
-
         if not auth_header.startswith('Bearer '):
-            return None    # wrong scheme
-
+            return None   # not our auth scheme — let other backends try
         token = auth_header[7:].strip()
-        if not token:
-            raise AuthenticationFailed('Empty Bearer token.')
+        payload = verify_token(token)
+        if not payload:
+            raise AuthenticationFailed('JWT invalid or expired.')
 
-        # Verify JWT — import here to avoid circular imports
-        try:
-            import jwt as pyjwt
-        except ImportError:
-            raise AuthenticationFailed(
-                'PyJWT not installed on server. Run: pip install PyJWT'
-            )
-
-        public_key = _load_public_key()
-
-        try:
-            payload = pyjwt.decode(
-                token,
-                public_key,
-                algorithms=['RS256'],
-                options={'verify_exp': True},
-            )
-        except pyjwt.ExpiredSignatureError:
-            raise AuthenticationFailed(
-                'JWT token expired. '
-                'POST to /api/agent/token/refresh/ with your refresh token.'
-            )
-        except pyjwt.InvalidSignatureError:
-            raise AuthenticationFailed('JWT signature invalid.')
-        except pyjwt.DecodeError as exc:
-            raise AuthenticationFailed(f'JWT decode error: {exc}')
-
-        if payload.get('type') != 'access':
-            raise AuthenticationFailed(
-                f"Wrong token type '{payload.get('type')}'. Need 'access' token."
-            )
-
-        agent_id = payload.get('agent_id')
-        if not agent_id:
-            raise AuthenticationFailed('JWT missing agent_id claim.')
-
-        # Load agent from database
+        agent_id = payload.get('agent_id', '')
         try:
             agent = Agent.objects.get(agent_id=agent_id, is_active=True)
         except Agent.DoesNotExist:
-            raise AuthenticationFailed(f'Agent "{agent_id}" not found or disabled.')
+            raise AuthenticationFailed(f'Agent "{agent_id}" not found or inactive.')
 
-        # ── Check 2: HMAC-SHA256 body signature ───────────────────────────────
-        timestamp_str = request.headers.get('X-Timestamp', '')
-        signature     = request.headers.get('X-Signature', '')
-
-        if not timestamp_str:
-            raise AuthenticationFailed(
-                'Missing X-Timestamp header. '
-                'Agent must sign every request with HMAC.'
-            )
-
-        if not signature:
-            raise AuthenticationFailed(
-                'Missing X-Signature header. '
-                'Agent must sign every request with HMAC.'
-            )
-
-        # Check timestamp freshness — prevents replay attacks
+        # ── 2. Timestamp replay window ────────────────────────────────────────
+        ts_header = request.headers.get('X-Timestamp', '')
+        if not ts_header:
+            raise AuthenticationFailed('X-Timestamp header missing.')
         try:
-            request_time = float(timestamp_str)
+            req_time = int(ts_header)
         except ValueError:
-            raise AuthenticationFailed('X-Timestamp must be a float (Unix time).')
-
-        age = abs(time.time() - request_time)
-        if age > TIMESTAMP_TOLERANCE:
+            raise AuthenticationFailed('X-Timestamp must be a Unix integer.')
+        age = abs(time.time() - req_time)
+        if age > REPLAY_WINDOW:
             raise AuthenticationFailed(
-                f'Request timestamp is {int(age)}s old. '
-                f'Max allowed: {TIMESTAMP_TOLERANCE}s. '
-                f'Check system clock on agent.'
+                f'Request timestamp too old ({int(age)}s > {REPLAY_WINDOW}s window).'
             )
 
-        # Compute expected HMAC and compare
-        try:
-            body = request.body.decode('utf-8')
-        except Exception:
-            body = ''
+        # ── 3. HMAC-SHA256 body signature ─────────────────────────────────────
+        sig_header = request.headers.get('X-Signature', '')
+        if not sig_header:
+            raise AuthenticationFailed('X-Signature header missing.')
 
-        expected_sig = hmac.new(
+        body = request.body.decode('utf-8', errors='replace')
+        expected = hmac.new(
             agent.secret_key.encode('utf-8'),
-            f"{timestamp_str}:{body}".encode('utf-8'),
-            hashlib.sha256
+            f'{ts_header}:{body}'.encode('utf-8'),
+            hashlib.sha256,
         ).hexdigest()
 
-        # compare_digest is safe against timing attacks
-        if not hmac.compare_digest(expected_sig, signature):
-            logger.warning(
-                f'HMAC mismatch for agent {agent_id} '
-                f'from {self._get_ip(request)}'
-            )
-            raise AuthenticationFailed(
-                'HMAC signature mismatch. '
-                'Request body may have been tampered with.'
-            )
+        if not hmac.compare_digest(expected, sig_header):
+            raise AuthenticationFailed('HMAC signature mismatch.')
 
-        # ── Both checks passed ────────────────────────────────────────────────
-        agent.mark_seen(ip_address=self._get_ip(request))
-        logger.info(f'Agent {agent_id} authenticated (JWT + HMAC)')
-
-        return (agent, token)
-
-    def authenticate_header(self, request):
-        return 'Bearer realm="MIAT-Agent-API"'
-
-    @staticmethod
-    def _get_ip(request) -> str:
-        fwd = request.META.get('HTTP_X_FORWARDED_FOR')
-        if fwd:
-            return fwd.split(',')[0].strip()
-        return request.META.get('REMOTE_ADDR', '')
+        # Mark the agent as seen (updates last_seen_at + total_requests)
+        agent.mark_seen(
+            ip_address=request.META.get('REMOTE_ADDR')
+        )
+        logger.debug(f'Auth OK: agent={agent_id}')
+        return _AgentProxy(agent), token

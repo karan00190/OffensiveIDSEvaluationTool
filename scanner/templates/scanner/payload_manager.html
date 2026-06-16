@@ -1,0 +1,820 @@
+<!-- scanner/templates/scanner/payload_manager.html -->
+{% extends "scanner/base.html" %} {% block title %}Payload Manager{% endblock %}
+{% block extra_css %}
+<style>
+  /* ── Upload zone ─────────────────────────────────────────────────────────── */
+  .upload-zone {
+    border: 2px dashed var(--border-md);
+    border-radius: 10px;
+    padding: 3rem 2rem;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.25s;
+    background: var(--bg-deep);
+    position: relative;
+  }
+  .upload-zone.drag-over {
+    border-color: var(--cyan);
+    background: rgba(0, 212, 255, 0.04);
+    box-shadow: 0 0 24px rgba(0, 212, 255, 0.1);
+  }
+  .upload-zone:hover {
+    border-color: var(--border-hi);
+    background: rgba(0, 212, 255, 0.02);
+  }
+  .uz-icon {
+    font-size: 42px;
+    color: var(--border-md);
+    display: block;
+    margin-bottom: 1rem;
+    transition: color 0.25s;
+  }
+  .upload-zone:hover .uz-icon,
+  .upload-zone.drag-over .uz-icon {
+    color: var(--cyan);
+  }
+
+  .uz-title {
+    font-family: var(--cond);
+    font-size: 16px;
+    font-weight: 600;
+    letter-spacing: 1px;
+    color: var(--text-sec);
+    margin-bottom: 6px;
+  }
+  .uz-sub {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text-dim);
+  }
+  #file-input {
+    display: none;
+  }
+
+  /* ── Upload form fields ──────────────────────────────────────────────────── */
+  .uform {
+    margin-top: 1.25rem;
+    display: none;
+  }
+  .uform.visible {
+    display: block;
+  }
+
+  .fl-label {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    margin-bottom: 7px;
+    display: block;
+  }
+  .fl-input {
+    width: 100%;
+    background: var(--bg-deep);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 10px 14px;
+    color: var(--text-pri);
+    font-family: var(--mono);
+    font-size: 12px;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  .fl-input:focus {
+    border-color: var(--cyan);
+  }
+
+  /* ── Selected file strip ─────────────────────────────────────────────────── */
+  .file-strip {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 14px;
+    margin-top: 0.75rem;
+    background: rgba(0, 212, 255, 0.04);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    display: none;
+  }
+  .file-strip.visible {
+    display: flex;
+  }
+  .fs-icon {
+    color: var(--cyan);
+    font-size: 18px;
+    flex-shrink: 0;
+  }
+  .fs-name {
+    font-family: var(--mono);
+    font-size: 12px;
+    flex: 1;
+    word-break: break-all;
+  }
+  .fs-size {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--text-dim);
+    flex-shrink: 0;
+  }
+  .fs-remove {
+    background: none;
+    border: none;
+    color: var(--text-dim);
+    cursor: pointer;
+    font-size: 16px;
+    flex-shrink: 0;
+  }
+  .fs-remove:hover {
+    color: var(--red);
+  }
+
+  /* ── Progress bar ────────────────────────────────────────────────────────── */
+  .progress-wrap {
+    margin-top: 1rem;
+    display: none;
+  }
+  .progress-wrap.visible {
+    display: block;
+  }
+  .progress-label {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--text-dim);
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 5px;
+  }
+  .progress-bar-bg {
+    background: var(--bg-void);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    overflow: hidden;
+    height: 6px;
+  }
+  .progress-bar-fill {
+    height: 100%;
+    width: 0%;
+    transition: width 0.15s linear;
+    background: linear-gradient(90deg, var(--cyan-dim), var(--cyan));
+    box-shadow: 0 0 8px rgba(0, 212, 255, 0.4);
+  }
+
+  /* ── Upload result message ───────────────────────────────────────────────── */
+  .upload-result {
+    margin-top: 1rem;
+    padding: 10px 14px;
+    border-radius: 6px;
+    font-family: var(--mono);
+    font-size: 12px;
+    display: none;
+  }
+  .upload-result.success {
+    display: block;
+    background: rgba(0, 255, 136, 0.06);
+    border: 1px solid rgba(0, 255, 136, 0.25);
+    color: #55ffaa;
+  }
+  .upload-result.error {
+    display: block;
+    background: rgba(255, 68, 85, 0.06);
+    border: 1px solid rgba(255, 68, 85, 0.25);
+    color: #ff8899;
+  }
+
+  /* ── Payload table ───────────────────────────────────────────────────────── */
+  .hash-cell {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--text-dim);
+    letter-spacing: 0.3px;
+  }
+  .exp-ok {
+    color: var(--green);
+    font-family: var(--mono);
+    font-size: 10px;
+  }
+  .exp-warn {
+    color: var(--amber);
+    font-family: var(--mono);
+    font-size: 10px;
+  }
+  .exp-dead {
+    color: var(--red);
+    font-family: var(--mono);
+    font-size: 10px;
+  }
+
+  .del-btn {
+    background: none;
+    border: 1px solid rgba(255, 68, 85, 0.25);
+    color: var(--red);
+    font-family: var(--mono);
+    font-size: 10px;
+    padding: 4px 10px;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .del-btn:hover {
+    background: rgba(255, 68, 85, 0.12);
+    border-color: var(--red);
+  }
+
+  .use-btn {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--cyan-dim);
+    text-decoration: none;
+    padding: 4px 10px;
+    border-radius: 4px;
+    border: 1px solid var(--border);
+    transition: all 0.15s;
+    white-space: nowrap;
+  }
+  .use-btn:hover {
+    color: var(--cyan);
+    border-color: var(--cyan);
+  }
+</style>
+{% endblock %} {% block content %}
+<div style="max-width: 1050px">
+  <!-- ── Page header ───────────────────────────────────────────────────── -->
+  <div
+    style="
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-between;
+      margin-bottom: 1.5rem;
+      flex-wrap: wrap;
+      gap: 1rem;
+    "
+  >
+    <div>
+      <div
+        class="pg-eyebrow"
+        style="
+          font-family: var(--mono);
+          font-size: 10px;
+          letter-spacing: 2px;
+          color: var(--text-dim);
+          text-transform: uppercase;
+          margin-bottom: 6px;
+          display: flex;
+          align-items: center;
+          gap: 8px;
+        "
+      >
+        <span
+          style="
+            width: 24px;
+            height: 1px;
+            background: var(--cyan-dim);
+            display: inline-block;
+          "
+        ></span>
+        Pull Model
+      </div>
+      <div
+        style="
+          font-family: var(--cond);
+          font-size: 28px;
+          font-weight: 700;
+          letter-spacing: 2px;
+        "
+      >
+        Payload Manager
+      </div>
+      <div
+        style="
+          font-family: var(--mono);
+          font-size: 11px;
+          color: var(--text-dim);
+          margin-top: 4px;
+        "
+      >
+        UPLOAD CUSTOM FILES &nbsp;·&nbsp; AGENT PULLS AT EXECUTION TIME
+        &nbsp;·&nbsp; NEVER WRITTEN TO DISK
+      </div>
+    </div>
+    <a href="{% url 'scanner:module_control' %}" class="btn btn-outline">
+      <i class="bi bi-arrow-left"></i> Back to Module Control
+    </a>
+  </div>
+
+  <!-- ── Pull model info strip ─────────────────────────────────────────── -->
+  <div
+    style="
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      padding: 12px 16px;
+      background: rgba(0, 212, 255, 0.04);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      margin-bottom: 1.5rem;
+      font-family: var(--mono);
+      font-size: 11px;
+      color: var(--text-dim);
+    "
+  >
+    <i
+      class="bi bi-info-circle"
+      style="color: var(--cyan); margin-top: 1px; flex-shrink: 0"
+    ></i>
+    <div>
+      Files uploaded here are stored server-side. When an exfil task is
+      dispatched in
+      <strong style="color: var(--text-sec)">Manual</strong> mode, the agent
+      receives only the download URL and SHA-256 checksum over the WebSocket. It
+      fetches raw bytes over the authenticated HTTPS endpoint at execution time
+      — no file bytes travel through the command channel. The agent holds
+      everything in <code>io.BytesIO</code> — the target filesystem is never
+      touched.
+    </div>
+  </div>
+
+  <div
+    style="
+      display: grid;
+      grid-template-columns: 420px 1fr;
+      gap: 1.5rem;
+      align-items: start;
+    "
+  >
+    <!-- LEFT: Upload form -->
+    <div>
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">
+            <i class="bi bi-cloud-upload"></i> Upload Payload File
+          </div>
+        </div>
+        <div style="padding: 1.25rem">
+          <!-- Drop zone -->
+          <div
+            class="upload-zone"
+            id="drop-zone"
+            onclick="document.getElementById('file-input').click()"
+            ondragover="onDragOver(event)"
+            ondragleave="onDragLeave(event)"
+            ondrop="onDrop(event)"
+          >
+            <i class="bi bi-file-earmark-arrow-up uz-icon"></i>
+            <div class="uz-title">Drop file here or click to browse</div>
+            <div class="uz-sub">Any file type · Max 35 MB</div>
+            <input
+              type="file"
+              id="file-input"
+              onchange="onFileSelected(this.files[0])"
+            />
+          </div>
+
+          <!-- Selected file strip -->
+          <div class="file-strip" id="file-strip">
+            <i class="bi bi-file-earmark-binary fs-icon"></i>
+            <span class="fs-name" id="fs-name">—</span>
+            <span class="fs-size" id="fs-size">—</span>
+            <button class="fs-remove" onclick="clearFile()" title="Remove">
+              ×
+            </button>
+          </div>
+
+          <!-- Name field + submit -->
+          <div class="uform" id="uform">
+            <div style="margin-bottom: 1rem; margin-top: 1rem">
+              <label class="fl-label">
+                Payload Name
+                <span
+                  style="
+                    color: var(--text-dim);
+                    text-transform: none;
+                    letter-spacing: 0.3px;
+                  "
+                >
+                  (optional — defaults to filename)
+                </span>
+              </label>
+              <input
+                id="payload-name"
+                class="fl-input"
+                type="text"
+                placeholder="e.g. Corp Credentials Q1"
+              />
+            </div>
+
+            <!-- Progress bar -->
+            <div class="progress-wrap" id="progress-wrap">
+              <div class="progress-label">
+                <span id="progress-label-txt">Uploading…</span>
+                <span id="progress-pct">0%</span>
+              </div>
+              <div class="progress-bar-bg">
+                <div class="progress-bar-fill" id="progress-fill"></div>
+              </div>
+            </div>
+
+            <!-- Result message -->
+            <div class="upload-result" id="upload-result"></div>
+
+            <button
+              id="upload-btn"
+              class="launch-btn"
+              style="
+                margin-top: 1rem;
+                padding: 10px;
+                font-family: var(--cond);
+                font-size: 14px;
+                font-weight: 700;
+                letter-spacing: 2px;
+                text-transform: uppercase;
+                background: var(--cyan);
+                color: var(--bg-void);
+                border: none;
+                border-radius: 6px;
+                cursor: pointer;
+                width: 100%;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                gap: 8px;
+                box-shadow: 0 0 16px rgba(0, 212, 255, 0.2);
+                transition: all 0.2s;
+              "
+              onclick="doUpload()"
+            >
+              <i class="bi bi-cloud-upload"></i> Upload Payload
+            </button>
+          </div>
+        </div>
+      </div>
+      <!-- /upload card -->
+    </div>
+    <!-- /left -->
+
+    <!-- RIGHT: Payloads table -->
+    <div>
+      <div
+        style="
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          margin-bottom: 0.75rem;
+        "
+      >
+        <div class="section-title">Uploaded Payloads</div>
+        <span
+          id="payload-count"
+          style="
+            font-family: var(--mono);
+            font-size: 10px;
+            color: var(--text-dim);
+          "
+        >
+          {{ payloads|length }} FILE{{ payloads|length|pluralize:"S" }}
+        </span>
+      </div>
+
+      <div class="card">
+        {% if payloads %}
+        <div style="overflow-x: auto">
+          <table class="data-table" id="payload-table">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Name</th>
+                <th>Size</th>
+                <th>SHA-256</th>
+                <th>Expires</th>
+                <th>By</th>
+                <th></th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="payload-tbody">
+              {% for p in payloads %}
+              <tr id="prow-{{ p.pk }}">
+                <td
+                  class="mono"
+                  style="font-size: 11px; color: var(--text-dim)"
+                >
+                  {{ p.pk }}
+                </td>
+                <td>
+                  <div
+                    style="
+                      font-family: var(--mono);
+                      font-size: 12px;
+                      color: var(--text-pri);
+                    "
+                  >
+                    {{ p.name }}
+                  </div>
+                  <div
+                    style="
+                      font-family: var(--mono);
+                      font-size: 9px;
+                      color: var(--text-dim);
+                      margin-top: 2px;
+                    "
+                  >
+                    {{ p.source_type|upper }}
+                  </div>
+                </td>
+                <td
+                  class="mono"
+                  style="font-size: 11px; color: var(--text-sec)"
+                >
+                  {{ p.size_display }}
+                </td>
+                <td class="hash-cell">{{ p.checksum_short }}</td>
+                <td>
+                  {% if not p.expires_at %}
+                  <span class="exp-ok">never</span>
+                  {% elif p.is_expired %}
+                  <span class="exp-dead"
+                    ><i class="bi bi-x-circle"></i> expired</span
+                  >
+                  {% else %}
+                  <span class="exp-warn"
+                    >{{ p.expires_at|timesince }} left</span
+                  >
+                  {% endif %}
+                </td>
+                <td
+                  class="mono"
+                  style="font-size: 10px; color: var(--text-dim)"
+                >
+                  {{ p.created_by.username|default:"—" }}
+                </td>
+                <td>
+                  {% if not p.is_expired %}
+                  <a
+                    href="{% url 'scanner:module_control' %}?payload={{ p.pk }}"
+                    class="use-btn"
+                  >
+                    <i class="bi bi-play-fill"></i> Use
+                  </a>
+                  {% endif %}
+                </td>
+                <td>
+                  <button
+                    class="del-btn"
+                    onclick="deletePayload({{ p.pk }}, '{{ p.name|escapejs }}')"
+                  >
+                    <i class="bi bi-trash"></i>
+                  </button>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% else %}
+        <div
+          style="
+            text-align: center;
+            padding: 4rem 2rem;
+            font-family: var(--mono);
+            font-size: 12px;
+            color: var(--text-dim);
+          "
+        >
+          <i
+            class="bi bi-cloud-upload"
+            style="
+              font-size: 36px;
+              display: block;
+              margin-bottom: 1rem;
+              color: var(--border-md);
+            "
+          ></i>
+          No payloads uploaded yet.<br />
+          <span style="color: var(--text-dim)">
+            Upload a file on the left to begin.
+          </span>
+        </div>
+        {% endif %}
+      </div>
+      <!-- /card -->
+    </div>
+    <!-- /right -->
+  </div>
+  <!-- /grid -->
+</div>
+{% endblock %} {% block extra_js %}
+<script>
+  "use strict";
+
+  const MAX_BYTES = 35 * 1024 * 1024;
+  let _selectedFile = null;
+
+  /* ── CSRF ─────────────────────────────────────────────────────────────── */
+  function csrf() {
+    const m = document.cookie.match(/(?:^|;\s*)csrftoken=([^;]*)/);
+    return m ? decodeURIComponent(m[1]) : "";
+  }
+
+  /* ── Drag and drop ────────────────────────────────────────────────────── */
+  function onDragOver(e) {
+    e.preventDefault();
+    document.getElementById("drop-zone").classList.add("drag-over");
+  }
+  function onDragLeave(e) {
+    document.getElementById("drop-zone").classList.remove("drag-over");
+  }
+  function onDrop(e) {
+    e.preventDefault();
+    document.getElementById("drop-zone").classList.remove("drag-over");
+    const f = e.dataTransfer.files[0];
+    if (f) onFileSelected(f);
+  }
+
+  /* ── File selected ────────────────────────────────────────────────────── */
+  function onFileSelected(file) {
+    if (!file) return;
+    if (file.size > MAX_BYTES) {
+      showResult(
+        `File is ${fmt(file.size)} — exceeds the 35 MB limit.`,
+        "error",
+      );
+      return;
+    }
+    _selectedFile = file;
+    document.getElementById("fs-name").textContent = file.name;
+    document.getElementById("fs-size").textContent = fmt(file.size);
+    document.getElementById("file-strip").classList.add("visible");
+    document.getElementById("uform").classList.add("visible");
+    document.getElementById("upload-result").style.display = "none";
+    document.getElementById("upload-result").className = "upload-result";
+  }
+
+  function clearFile() {
+    _selectedFile = null;
+    document.getElementById("file-input").value = "";
+    document.getElementById("file-strip").classList.remove("visible");
+    document.getElementById("uform").classList.remove("visible");
+    document.getElementById("upload-result").style.display = "none";
+  }
+
+  /* ── Upload ───────────────────────────────────────────────────────────── */
+  async function doUpload() {
+    if (!_selectedFile) return;
+    const btn = document.getElementById("upload-btn");
+    btn.disabled = true;
+    btn.innerHTML = '<i class="bi bi-hourglass-split"></i> Uploading…';
+
+    showProgress(true);
+    setProgress(0, "Uploading…");
+
+    const fd = new FormData();
+    fd.append("payload_file", _selectedFile);
+    fd.append("name", document.getElementById("payload-name").value.trim());
+
+    return new Promise((resolve) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open("POST", "/modules/payloads/upload/");
+      xhr.setRequestHeader("X-CSRFToken", csrf());
+
+      xhr.upload.addEventListener("progress", (e) => {
+        if (e.lengthComputable) {
+          const pct = Math.round((e.loaded / e.total) * 100);
+          setProgress(pct, `Uploading… ${pct}%`);
+        }
+      });
+
+      xhr.addEventListener("load", () => {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="bi bi-cloud-upload"></i> Upload Payload';
+        showProgress(false);
+
+        if (xhr.status === 201) {
+          const d = JSON.parse(xhr.responseText);
+          showResult(
+            `✓ Uploaded: <strong>${d.name}</strong>  ${d.size_display}  ·  ${d.checksum_short}`,
+            "success",
+          );
+          clearFile();
+          addRowToTable(d);
+        } else {
+          let msg = `HTTP ${xhr.status}`;
+          try {
+            msg = JSON.parse(xhr.responseText).error || msg;
+          } catch {}
+          showResult(`✗ Upload failed: ${msg}`, "error");
+        }
+        resolve();
+      });
+
+      xhr.addEventListener("error", () => {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="bi bi-cloud-upload"></i> Upload Payload';
+        showProgress(false);
+        showResult("✗ Network error during upload.", "error");
+        resolve();
+      });
+
+      xhr.send(fd);
+    });
+  }
+
+  /* ── Delete payload ───────────────────────────────────────────────────── */
+  async function deletePayload(id, name) {
+    if (
+      !confirm(
+        `Delete payload "${name}"?\n\nThe file will be permanently removed from storage.`,
+      )
+    )
+      return;
+
+    const r = await fetch(`/api/modules/payloads/${id}/delete/`, {
+      method: "POST",
+      headers: { "X-CSRFToken": csrf() },
+    });
+
+    if (r.ok) {
+      const row = document.getElementById(`prow-${id}`);
+      if (row) {
+        row.style.transition = "opacity .3s";
+        row.style.opacity = "0";
+        setTimeout(() => row.remove(), 320);
+      }
+      updateCount(-1);
+    } else {
+      alert("Delete failed — check the server logs.");
+    }
+  }
+
+  /* ── DOM helpers ──────────────────────────────────────────────────────── */
+  function showProgress(visible) {
+    document
+      .getElementById("progress-wrap")
+      .classList.toggle("visible", visible);
+  }
+  function setProgress(pct, label) {
+    document.getElementById("progress-fill").style.width = pct + "%";
+    document.getElementById("progress-pct").textContent = pct + "%";
+    document.getElementById("progress-label-txt").textContent = label;
+  }
+  function showResult(html, type) {
+    const el = document.getElementById("upload-result");
+    el.innerHTML = html;
+    el.className = `upload-result ${type}`;
+  }
+
+  function fmt(bytes) {
+    if (bytes < 1024) return bytes + " B";
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + " KB";
+    return (bytes / (1024 * 1024)).toFixed(1) + " MB";
+  }
+
+  function updateCount(delta) {
+    const el = document.getElementById("payload-count");
+    if (!el) return;
+    const cur = parseInt(el.textContent) || 0;
+    const n = Math.max(0, cur + delta);
+    el.textContent = `${n} FILE${n !== 1 ? "S" : ""}`;
+  }
+
+  function addRowToTable(d) {
+    const tbody = document.getElementById("payload-tbody");
+    if (!tbody) {
+      location.reload();
+      return;
+    }
+    const empty = document.querySelector('.card [style*="No payloads"]');
+    if (empty)
+      empty.closest(".card").innerHTML =
+        '<table class="data-table" id="payload-table"><thead><tr><th>#</th><th>Name</th><th>Size</th><th>SHA-256</th><th>Expires</th><th>By</th><th></th><th></th></tr></thead><tbody id="payload-tbody"></tbody></table>';
+    const tb = document.getElementById("payload-tbody");
+    const tr = document.createElement("tr");
+    tr.id = `prow-${d.payload_id}`;
+    tr.innerHTML = `
+    <td class="mono" style="font-size:11px;color:var(--text-dim)">${d.payload_id}</td>
+    <td><div style="font-family:var(--mono);font-size:12px;color:var(--text-pri)">${d.name}</div>
+        <div style="font-family:var(--mono);font-size:9px;color:var(--text-dim);margin-top:2px">MANUAL</div></td>
+    <td class="mono" style="font-size:11px;color:var(--text-sec)">${d.size_display}</td>
+    <td class="hash-cell">${d.checksum_short}</td>
+    <td><span class="exp-warn">24h</span></td>
+    <td class="mono" style="font-size:10px;color:var(--text-dim)">you</td>
+    <td><a href="/modules/?payload=${d.payload_id}" class="use-btn"><i class="bi bi-play-fill"></i> Use</a></td>
+    <td><button class="del-btn" onclick="deletePayload(${d.payload_id},'${d.name.replace(/'/g, "\\'")}')">
+          <i class="bi bi-trash"></i></button></td>`;
+    tb.insertBefore(tr, tb.firstChild);
+    updateCount(1);
+  }
+
+  /* ── On load: pre-select payload from query string ──────────────────── */
+  document.addEventListener("DOMContentLoaded", () => {
+    const params = new URLSearchParams(location.search);
+    const pid = params.get("payload");
+    if (pid) {
+      const row = document.getElementById(`prow-${pid}`);
+      if (row) {
+        row.style.background = "rgba(0,212,255,.04)";
+        row.scrollIntoView({ behavior: "smooth", block: "center" });
+      }
+    }
+  });
+</script>
+{% endblock %}

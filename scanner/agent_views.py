@@ -1,125 +1,69 @@
 # scanner/agent_views.py
-# =============================================================================
-#  MIAT — Agent API Endpoints (Final)
-#  Registration now issues JWT tokens immediately on success.
-#  All other endpoints use the combined AgentAuthentication (JWT + HMAC).
-# =============================================================================
-
 import logging
-from django.utils  import timezone
-from django.conf   import settings
+from django.conf                    import settings
+from rest_framework.decorators      import api_view, authentication_classes, permission_classes
+from rest_framework.permissions     import IsAuthenticated, AllowAny
+from rest_framework.response        import Response
+from rest_framework                 import status
 
-from rest_framework.decorators  import api_view, authentication_classes, permission_classes
-from rest_framework.permissions import IsAuthenticated, AllowAny
-from rest_framework.response    import Response
-from rest_framework             import status
-
-from .models         import Agent, ScanRequest, ScanStatus
 from .authentication import AgentAuthentication
+from .models         import Agent, ScanRequest, ScanProfile, ScanStatus
+from .jwt_auth       import create_access_token, create_refresh_token
 
-logger = logging.getLogger(__name__)
+logger  = logging.getLogger('MIAT.AgentViews')
+REG_KEY = getattr(settings, 'MIAT_REGISTRATION_KEY', 'changeme-set-in-settings')
 
 
 # =============================================================================
-# ENDPOINT 1 — Register agent + immediately issue JWT
+# REGISTRATION
 # POST /api/agent/register/
-# No auth required (this creates the auth credentials)
 # =============================================================================
 
 @api_view(['POST'])
 @permission_classes([AllowAny])
 def agent_register(request):
     """
-    Register a new agent.
-    On success returns auth_token, secret_key, AND initial JWT tokens.
-    Agent can start making authenticated calls immediately — no second step.
-
-    Request:
-        { "agent_id": "barc-lab-01", "name": "...", "registration_key": "..." }
-
-    Response:
-        {
-            "agent_id":      "barc-lab-01",
-            "auth_token":    "abc...",      ← for HMAC signing
-            "secret_key":    "xyz...",      ← for HMAC signing
-            "access_token":  "eyJ...",      ← JWT, expires 15 min
-            "refresh_token": "eyJ...",      ← JWT, expires 24 hr
-            "expires_in":    900
-        }
+    First-time agent registration.
+    Creates the Agent row and issues the auth_token + secret_key pair.
     """
-    from .jwt_auth import create_access_token, create_refresh_token, JWT_ACCESS_EXPIRY_MINUTES
-
-    registration_key = request.data.get('registration_key', '')
-    expected_key     = getattr(settings, 'AGENT_REGISTRATION_KEY', '')
-
-    if not expected_key:
-        return Response(
-            {'error': 'AGENT_REGISTRATION_KEY not set in settings.py'},
-            status=status.HTTP_500_INTERNAL_SERVER_ERROR
-        )
-
-    if registration_key != expected_key:
-        logger.warning(
-            f'Failed registration from {request.META.get("REMOTE_ADDR")} '
-            f'— wrong key'
-        )
-        return Response(
-            {'error': 'Invalid registration key.'},
-            status=status.HTTP_403_FORBIDDEN
-        )
-
     agent_id = request.data.get('agent_id', '').strip()
-    name     = request.data.get('name', agent_id)
+    name     = request.data.get('name', '').strip()
+    reg_key  = request.data.get('registration_key', '').strip()
 
-    if not agent_id:
-        return Response(
-            {'error': 'agent_id is required.'},
-            status=status.HTTP_400_BAD_REQUEST
-        )
+    if not agent_id or not reg_key:
+        return Response({'error': 'agent_id and registration_key required.'}, status=400)
 
-    if Agent.objects.filter(agent_id=agent_id).exists():
-        return Response(
-            {'error': f'Agent "{agent_id}" already registered.'},
-            status=status.HTTP_409_CONFLICT
-        )
+    if reg_key != REG_KEY:
+        return Response({'error': 'Invalid registration key.'}, status=401)
 
-    # Create agent with generated credentials
-    auth_token = Agent.generate_auth_token()
-    secret_key = Agent.generate_secret_key()
-
-    agent = Agent.objects.create(
-        agent_id   = agent_id,
-        name       = name,
-        auth_token = auth_token,
-        secret_key = secret_key,
+    agent, created = Agent.objects.get_or_create(
+        agent_id=agent_id,
+        defaults={
+            'name':       name or agent_id,
+            'auth_token': Agent.generate_auth_token(),
+            'secret_key': Agent.generate_secret_key(),
+            'is_active':  True,
+        },
     )
 
-    # Issue JWT tokens immediately — agent doesn't need a second login call
-    access_token  = create_access_token(agent)
-    refresh_token = create_refresh_token(agent)
+    if not created and not agent.is_active:
+        return Response({'error': f'Agent "{agent_id}" exists but is disabled.'}, status=403)
 
-    logger.info(f'Agent registered and JWT issued: {agent_id}')
+    action = 'registered' if created else 're-authenticated'
+    logger.info(f'Agent {action}: {agent_id}')
 
     return Response({
-        # Credentials for HMAC signing (save permanently)
         'agent_id':   agent.agent_id,
-        'auth_token': auth_token,
-        'secret_key': secret_key,
-
-        # JWT tokens (access expires in 15 min, refresh in 24hr)
-        'access_token':  access_token,
-        'refresh_token': refresh_token,
-        'expires_in':    JWT_ACCESS_EXPIRY_MINUTES * 60,
-
-        'message': (
-            'Agent registered. Save auth_token and secret_key permanently. '
-            'Use access_token for immediate API calls.'
-        ),
-    }, status=status.HTTP_201_CREATED)
+        'auth_token': agent.auth_token,
+        'secret_key': agent.secret_key,
+        'access':     create_access_token(agent.agent_id),
+        'refresh':    create_refresh_token(agent.agent_id),
+        'action':     action,
+    }, status=201 if created else 200)
 
 
 # =============================================================================
-# ENDPOINT 2 — Heartbeat
+# HEARTBEAT
 # POST /api/agent/heartbeat/
 # =============================================================================
 
@@ -127,19 +71,57 @@ def agent_register(request):
 @authentication_classes([AgentAuthentication])
 @permission_classes([IsAuthenticated])
 def agent_heartbeat(request):
-    """Agent sends this every 30s to confirm it's alive."""
-    agent = request.user
+    """
+    Periodic keep-alive.  Updates last_seen_at, optionally updates capabilities.
+    Called every HEARTBEAT_INTERVAL seconds by the orchestrator.
+    """
+    agent_proxy  = request.user
+    capabilities = request.data.get('capabilities', [])
+    plugins      = request.data.get('plugins', [])
+
+    try:
+        agent = Agent.objects.get(agent_id=agent_proxy.agent_id)
+        if capabilities:
+            agent.capabilities = capabilities
+            agent.save(update_fields=['capabilities'])
+    except Agent.DoesNotExist:
+        pass
 
     return Response({
-        'acknowledged':  True,
-        'server_time':   timezone.now().isoformat(),
-        'agent_id':      agent.agent_id,
-        'commands':      [],   # future: pending commands from server
+        'status':  'alive',
+        'plugins': plugins,
     })
 
 
 # =============================================================================
-# ENDPOINT 3 — Submit scan
+# CAPABILITY REGISTRATION
+# POST /api/agent/capabilities/
+# =============================================================================
+
+@api_view(['POST'])
+@authentication_classes([AgentAuthentication])
+@permission_classes([IsAuthenticated])
+def agent_capabilities(request):
+    """
+    Called by the orchestrator after all plugins are loaded.
+    Stores capability metadata in the Agent row.
+    """
+    capabilities = request.data.get('capabilities', [])
+    try:
+        agent = Agent.objects.get(agent_id=request.user.agent_id)
+        agent.capabilities = capabilities
+        agent.save(update_fields=['capabilities'])
+        logger.info(
+            f"Capabilities stored for {agent.agent_id}: "
+            f"{[c.get('name') for c in capabilities]}"
+        )
+    except Agent.DoesNotExist:
+        pass
+    return Response({'stored': len(capabilities)})
+
+
+# =============================================================================
+# AGENT-SUBMITTED SCAN
 # POST /api/agent/scan/submit/
 # =============================================================================
 
@@ -147,63 +129,34 @@ def agent_heartbeat(request):
 @authentication_classes([AgentAuthentication])
 @permission_classes([IsAuthenticated])
 def agent_submit_scan(request):
-    """Agent submits a scan request. Server queues via django-q2."""
-    from django_q.tasks  import async_task
-    from datetime        import timedelta
-
-    agent        = request.user
-    target       = request.data.get('target', '').strip()
-    scan_profile = request.data.get('scan_profile', 'default')
+    """
+    Agent submits a scan request on behalf of a web-initiated nmap task.
+    Creates a ScanRequest row tied to the submitting agent.
+    """
+    target  = request.data.get('target', '').strip()
+    profile = request.data.get('scan_profile', ScanProfile.DEFAULT)
 
     if not target:
-        return Response(
-            {'error': 'target is required.'},
-            status=status.HTTP_400_BAD_REQUEST
-        )
+        return Response({'error': 'target is required.'}, status=400)
 
-    # Token cache check
-    token      = ScanRequest.generate_token(target, scan_profile)
-    ttl        = getattr(settings, 'SCAN_CACHE_TTL', 3600)
-    cutoff     = timezone.now() - timedelta(seconds=ttl)
-    cached     = ScanRequest.objects.filter(
-        token=token,
-        status=ScanStatus.COMPLETE,
-        completed_at__gte=cutoff
-    ).first()
-
-    if cached:
-        return Response({
-            'scan_id':   cached.pk,
-            'status':    'complete',
-            'cache_hit': True,
-            'token':     token,
-        })
+    try:
+        agent = Agent.objects.get(agent_id=request.user.agent_id)
+    except Agent.DoesNotExist:
+        agent = None
 
     scan = ScanRequest.objects.create(
         target       = target,
-        scan_profile = scan_profile,
+        scan_profile = profile,
+        agent        = agent,
         status       = ScanStatus.PENDING,
     )
 
-    async_task(
-        'scanner.tasks.run_scan_task',
-        scan.pk,
-        task_name = f'miat_scan_{scan.pk}',
-    )
-
-    logger.info(f'Agent {agent.agent_id} queued scan #{scan.pk} for {target}')
-
-    return Response({
-        'scan_id':    scan.pk,
-        'status':     scan.status,
-        'cache_hit':  False,
-        'token':      token,
-        'status_url': f'/api/scan/{scan.pk}/status/',
-    }, status=status.HTTP_202_ACCEPTED)
+    logger.info(f'Agent {request.user.agent_id} submitted scan #{scan.pk} → {target}')
+    return Response({'scan_id': scan.pk, 'status': scan.status}, status=201)
 
 
 # =============================================================================
-# ENDPOINT 4 — Post results
+# GENERIC RESULT INGESTION
 # POST /api/agent/results/
 # =============================================================================
 
@@ -211,26 +164,26 @@ def agent_submit_scan(request):
 @authentication_classes([AgentAuthentication])
 @permission_classes([IsAuthenticated])
 def agent_post_results(request):
-    """Agent posts findings from any module (DGA, exfil, etc.)"""
-    agent    = request.user
-    module   = request.data.get('module', 'unknown')
-    target   = request.data.get('target', '')
-    findings = request.data.get('findings', [])
+    """
+    Generic catch-all result endpoint.
+    Plugin-specific results should go to their dedicated endpoints:
+      /api/agent/dga/results/   → dga_views.api_dga_results
+      /api/agent/exfil/results/ → exfil_views.api_exfil_results
+    This endpoint handles nmap PortFindings and any future plugin results.
+    """
+    plugin  = request.data.get('plugin', 'unknown')
+    success = request.data.get('success', True)
+    data    = request.data.get('data', {})
 
     logger.info(
-        f'Agent {agent.agent_id} posted {len(findings)} '
-        f'results for module={module} target={target}'
+        f"Result received from agent {request.user.agent_id}: "
+        f"plugin={plugin} success={success}"
     )
-
-    return Response({
-        'acknowledged':   True,
-        'module':         module,
-        'findings_count': len(findings),
-    })
+    return Response({'received': True, 'plugin': plugin})
 
 
 # =============================================================================
-# ENDPOINT 5 — Poll commands
+# COMMAND POLL (fallback — primary path is WebSocket)
 # GET /api/agent/status/
 # =============================================================================
 
@@ -238,10 +191,25 @@ def agent_post_results(request):
 @authentication_classes([AgentAuthentication])
 @permission_classes([IsAuthenticated])
 def agent_poll_commands(request):
-    """Agent polls for pending commands (fallback if WebSocket unavailable)."""
-    agent = request.user
-    return Response({
-        'agent_id':  agent.agent_id,
-        'commands':  [],
-        'timestamp': timezone.now().isoformat(),
-    })
+    """
+    HTTP fallback for agents that cannot maintain a WebSocket connection.
+    Returns any pending commands for this agent.
+    Primary command delivery is via WebSocket (AgentConsumer).
+    """
+    from .models import ModuleTask, TaskStatus
+    pending = (
+        ModuleTask.objects
+        .filter(agent__agent_id=request.user.agent_id, status=TaskStatus.PENDING)
+        .values('task_id', 'module', 'config_json')
+        .order_by('dispatched_at')[:5]
+    )
+
+    commands = []
+    for t in pending:
+        commands.append({
+            'task_id': str(t['task_id']),
+            'command': t['module'],
+            'args':    {**t['config_json'], 'task_id': str(t['task_id'])},
+        })
+
+    return Response({'commands': commands, 'count': len(commands)})

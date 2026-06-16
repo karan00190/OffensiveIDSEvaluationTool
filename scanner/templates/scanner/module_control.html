@@ -396,12 +396,33 @@
             </div>
           </div>
 
-          <!-- Target + Payload -->
-          <div class="fl-two">
-            <div class="fl">
-              <label class="fl-label">Target <span class="req">*</span></label>
-              <input id="exfil-target" class="fl-input" type="text" placeholder="192.168.1.1"/>
+          <!-- Target -->
+          <div class="fl">
+            <label class="fl-label">Target <span class="req">*</span></label>
+            <input id="exfil-target" class="fl-input" type="text" placeholder="192.168.1.1"/>
+          </div>
+
+          <!-- Payload Mode Toggle -->
+          <div class="fl">
+            <label class="fl-label">Payload Source <span class="req">*</span></label>
+            <div class="choice-grid" style="grid-template-columns:1fr 1fr">
+              <div class="choice-card c-sel" data-group="pmode" data-value="generated"
+                   style="--cc:var(--cyan)" onclick="pickChoice(this);setPayloadMode('generated')">
+                <i class="bi bi-cpu ci"></i>
+                <div class="cn">Machine Generated</div>
+                <div class="cs">Synthesised on-the-fly</div>
+              </div>
+              <div class="choice-card" data-group="pmode" data-value="manual"
+                   style="--cc:var(--amber)" onclick="pickChoice(this);setPayloadMode('manual')">
+                <i class="bi bi-cloud-upload ci"></i>
+                <div class="cn">Manual Upload</div>
+                <div class="cs">Admin-uploaded file (Pull)</div>
+              </div>
             </div>
+          </div>
+
+          <!-- Generated opts -->
+          <div id="generated-opts">
             <div class="fl">
               <label class="fl-label">Payload Type</label>
               <select id="exfil-payload" class="fl-select">
@@ -411,6 +432,43 @@
                 <option value="db_dump">DB Dump</option>
                 <option value="config">Config File</option>
               </select>
+            </div>
+          </div>
+
+          <!-- Manual upload opts (Pull Model) -->
+          <div id="manual-opts" style="display:none">
+            <div class="fl">
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:7px">
+                <label class="fl-label" style="margin-bottom:0">
+                  Uploaded Payload <span class="req">*</span>
+                </label>
+                <a href="{% url 'scanner:payload_manager' %}" target="_blank"
+                   style="font-family:var(--mono);font-size:10px;color:var(--cyan-dim);text-decoration:none">
+                  <i class="bi bi-plus-circle"></i> Upload new
+                </a>
+              </div>
+              <select id="exfil-payload-manual" class="fl-select"
+                      onchange="updatePayloadMeta()">
+                <option value="">— Loading payloads… —</option>
+              </select>
+              <!-- Metadata strip shown after selection -->
+              <div id="payload-meta" style="display:none;
+                   margin-top:8px;padding:8px 10px;
+                   background:var(--bg-deep);border:1px solid var(--border);border-radius:4px;
+                   font-family:var(--mono);font-size:10px;color:var(--text-dim);
+                   display:flex;gap:16px;flex-wrap:wrap">
+                <span>Size: <span id="pm-size" style="color:var(--text-sec)">—</span></span>
+                <span>SHA-256: <span id="pm-hash" style="color:var(--text-sec)">—</span></span>
+                <span>Expires: <span id="pm-exp" style="color:var(--text-sec)">—</span></span>
+              </div>
+              <div id="payload-empty-warn"
+                   style="display:none;font-family:var(--mono);font-size:11px;
+                          color:var(--amber);margin-top:6px">
+                <i class="bi bi-exclamation-triangle"></i>
+                No payloads uploaded yet.
+                <a href="{% url 'scanner:payload_manager' %}" target="_blank"
+                   style="color:var(--cyan)">Upload one first →</a>
+              </div>
             </div>
           </div>
 
@@ -792,19 +850,69 @@ async function launchDga() {
 }
 
 /* ── Exfil launch ──────────────────────────────────────────────────────── */
+/* ── Payload mode ──────────────────────────────────────────────────────── */
+let _payloadCache = [];   // cache from last list_payloads fetch
+
+function setPayloadMode(mode) {
+  document.getElementById('generated-opts').style.display = mode === 'generated' ? '' : 'none';
+  document.getElementById('manual-opts').style.display    = mode === 'manual'    ? '' : 'none';
+  if (mode === 'manual') loadPayloads();
+}
+
+async function loadPayloads() {
+  const sel  = document.getElementById('exfil-payload-manual');
+  const warn = document.getElementById('payload-empty-warn');
+  sel.innerHTML = '<option value="">Loading…</option>';
+  try {
+    const r    = await fetch('/api/modules/payloads/');
+    const data = await r.json();
+    _payloadCache = data.payloads || [];
+    if (!_payloadCache.length) {
+      sel.innerHTML = '<option value="">— No payloads uploaded —</option>';
+      if (warn) warn.style.display = 'block';
+      return;
+    }
+    if (warn) warn.style.display = 'none';
+    sel.innerHTML = '<option value="">— Select payload —</option>' +
+      _payloadCache.map(p =>
+        `<option value="${p.id}" data-size="${p.size_display}"
+          data-hash="${p.checksum_short}" data-exp="${p.expires_at ? p.expires_at.slice(0,10) : 'never'}"
+          ${p.expired ? 'disabled' : ''}>
+          ${p.name} (${p.size_display})${p.expired ? ' — EXPIRED' : ''}
+        </option>`
+      ).join('');
+  } catch(e) {
+    sel.innerHTML = '<option value="">— Failed to load —</option>';
+    appendLine('✗ Could not fetch payload list: ' + e.message, 'error');
+  }
+}
+
+function updatePayloadMeta() {
+  const sel  = document.getElementById('exfil-payload-manual');
+  const meta = document.getElementById('payload-meta');
+  const opt  = sel.options[sel.selectedIndex];
+  if (!opt || !opt.value) { if (meta) meta.style.display = 'none'; return; }
+  setTxt('pm-size', opt.dataset.size || '—');
+  setTxt('pm-hash', opt.dataset.hash || '—');
+  setTxt('pm-exp',  opt.dataset.exp  || '—');
+  if (meta) meta.style.display = 'flex';
+}
+
 async function launchExfil() {
   clearErr('exfil');
   const agentId = document.getElementById('agent-select').value;
   if (!agentId) { showErr('exfil', 'Select a target agent first.'); return; }
 
-  const techCard = document.querySelector('.choice-card[data-group="technique"].c-sel');
-  const profCard = document.querySelector('.choice-card[data-group="profile"].c-sel');
-  const target   = document.getElementById('exfil-target').value.trim();
+  const techCard  = document.querySelector('.choice-card[data-group="technique"].c-sel');
+  const profCard  = document.querySelector('.choice-card[data-group="profile"].c-sel');
+  const pmodeCard = document.querySelector('.choice-card[data-group="pmode"].c-sel');
+  const target    = document.getElementById('exfil-target').value.trim();
 
-  if (!techCard) { showErr('exfil', 'Select an exfil technique.'); return; }
-  if (!profCard) { showErr('exfil', 'Select a behavioral profile.'); return; }
-  if (!target)   { showErr('exfil', 'Target IP or hostname is required.'); return; }
+  if (!techCard)  { showErr('exfil', 'Select an exfil technique.'); return; }
+  if (!profCard)  { showErr('exfil', 'Select a behavioral profile.'); return; }
+  if (!target)    { showErr('exfil', 'Target IP or hostname is required.'); return; }
 
+  const pmode   = pmodeCard ? pmodeCard.dataset.value : 'generated';
   const profile = profCard.dataset.value;
   const drip    = parseFloat(document.getElementById('exfil-drip').value);
   const jMin    = parseFloat(document.getElementById('exfil-jmin').value);
@@ -815,16 +923,38 @@ async function launchExfil() {
   if (profile === 'jitter' && (isNaN(jMin) || isNaN(jMax) || jMin >= jMax || jMax > 120))
       { showErr('exfil', 'Jitter: min < max, and max ≤ 120 s.'); return; }
 
+  // ── Build payload fields depending on mode ────────────────────────────
+  let payloadFields = {};
+  if (pmode === 'generated') {
+    payloadFields = {
+      payload_mode: 'generated',
+      payload_type: document.getElementById('exfil-payload').value,
+    };
+  } else {
+    const sel       = document.getElementById('exfil-payload-manual');
+    const payloadId = sel ? sel.value : '';
+    if (!payloadId) { showErr('exfil', 'Select an uploaded payload or upload one first.'); return; }
+    const p = _payloadCache.find(x => String(x.id) === String(payloadId));
+    if (!p)  { showErr('exfil', 'Payload not found in cache — reload the page.'); return; }
+    payloadFields = {
+      payload_mode:     'manual',
+      payload_id:       p.id,
+      payload_url:      p.download_url,
+      payload_checksum: p.checksum,
+      payload_size:     p.size,
+    };
+  }
+
   await doDispatch('exfil', '/api/modules/exfil/dispatch/', {
     agent_id:      agentId,
     technique:     techCard.dataset.value,
     profile:       profile,
     target:        target,
-    payload_type:  document.getElementById('exfil-payload').value,
     dns_domain:    document.getElementById('exfil-dnsdomain').value.trim() || 'exfil-test.local',
     drip_interval: drip,
     jitter_min:    jMin,
     jitter_max:    jMax,
+    ...payloadFields,
   });
 }
 

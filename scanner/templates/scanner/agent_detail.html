@@ -1,6 +1,9 @@
 <!-- scanner/templates/scanner/agent_detail.html -->
-{% extends "scanner/base.html" %} {% block title %}Agent — {{ agent.agent_id
-}}{% endblock %} {% block extra_css %}
+{% extends "scanner/base.html" %} 
+{% block title %} Agent — {{ agent.agent_id }}
+{% endblock %}  
+
+{% block extra_css %}
 <style>
   .pg-eyebrow {
     font-family: var(--mono);
@@ -557,8 +560,7 @@
               color: var(--text-dim);
             "
           >
-            {% if agent.last_seen_at %}Not connected{% else %}Never connected{%
-            endif %}
+            {% if agent.last_seen_at %}Not connected{% else %}Never connected{% endif %}
           </div>
           <div
             style="
@@ -570,14 +572,14 @@
           >
             Start agent.py on the endpoint
           </div>
-          {% endif %}
-        </div>
+          {% endif %} </div>
       </div>
     </div>
   </div>
 </div>
 {% endblock %} 
-{% blockextra_js %}
+{% block extra_js %}
+
 <script>
   function copyToken(token, el) {
     navigator.clipboard.writeText(token).then(() => {

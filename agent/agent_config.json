@@ -1,7 +1,7 @@
 {
-  "server_url": "http://127.0.0.1:8000",
-  "agent_id": "102",
-  "auth_token": "031a82300721c33295506c48b65c39a3fcd95ecea352e60039506a36ce2a7088",
-  "secret_key": "4d2fa5519fc9d69f60f6558b8529339abdf9dd77757c4d033d7e46bdb81762ff",
-  "registration_key": "change-this-to-something-strong"
+  "server_url":  "http://127.0.0.1:8080",
+  "agent_id":    "Lab10",
+  "auth_token":  "7918f5dd771420f55bea0d0f85563400e776da38aeb655546859700791083955",
+  "secret_key":  "3421f7a07dd9e6dbb7883798e7df85dd2177b082c1d13d75c9bfb85223e2f6a5",
+  "registration_key":"change-this-to-something-strong"
 }

@@ -66,17 +66,8 @@ class Orchestrator:
     # STARTUP
     # =========================================================================
 
-    # =========================================================================
-    # STARTUP
-    # =========================================================================
-
     async def start(self) -> None:
         self._running = True
-        
-        # ─── ADD THIS LINE HERE ──────────────────────────────────────────────
-        self.loop = asyncio.get_running_loop()
-        # ─────────────────────────────────────────────────────────────────────
-
         logger.info("=" * 56)
         logger.info("  MIAT Orchestrator starting")
         logger.info(f"  Agent ID : {self.config.agent_id}")
@@ -84,8 +75,8 @@ class Orchestrator:
         logger.info(f"  Security : mTLS + JWT + HMAC")
         logger.info("=" * 56)
 
-        # Update this line to use self.loop instead of loop
-        await self.loop.run_in_executor(None, self.transport.authenticate)
+        loop = asyncio.get_event_loop()
+        await loop.run_in_executor(None, self.transport.authenticate)
 
         count = self.plugins.load_all()
         if count == 0:
@@ -124,9 +115,9 @@ class Orchestrator:
 
     async def _register_capabilities(self) -> None:
         capabilities = self.plugins.get_all_info()
+        loop         = asyncio.get_event_loop()
         try:
-            # Replaced local loop lookup with self.loop
-            await self.loop.run_in_executor(
+            await loop.run_in_executor(
                 None,
                 lambda: self.transport.post('/api/agent/capabilities/', {
                     'agent_id':     self.config.agent_id,
@@ -144,19 +135,12 @@ class Orchestrator:
     # COMMAND DISPATCH
     # =========================================================================
 
-    # =========================================================================
-    # COMMAND DISPATCH
-    # =========================================================================
-
     def _on_ws_command(self, data: dict) -> None:
         """Bridge from WS thread (sync) into the asyncio event loop."""
-        # Check if our main loop is alive, then pass the work to it safely
-        if hasattr(self, 'loop') and self.loop.is_running():
-            asyncio.run_coroutine_threadsafe(
-                self.dispatch_command(data), self.loop
-            )
-        else:
-            logger.error("Main event loop is not running. Cannot process WS command.")
+        loop = asyncio.get_event_loop()
+        asyncio.run_coroutine_threadsafe(
+            self.dispatch_command(data), loop,
+        )
 
     async def dispatch_command(self, data: dict) -> None:
         """Route an incoming server command to the correct plugin."""
@@ -233,8 +217,11 @@ class Orchestrator:
         from plugin_base import PluginStatus
 
         plugin._stop_event.clear()
-        plugin.status = PluginStatus.RUNNING
-        plugin.config = args
+        plugin.status     = PluginStatus.RUNNING
+        plugin.config     = args
+        # Inject transport so exfil_plugin can call get_raw_bytes()
+        # for the pull-model manual payload fetch.  Other plugins ignore it.
+        plugin._transport = self.transport
 
         logger.info(f"Plugin [{plugin.name}] starting")
 
