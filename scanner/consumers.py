@@ -140,10 +140,10 @@ class AgentConsumer(AsyncWebsocketConsumer):
         """Push a command from server to agent instantly."""
         await self.send(text_data=json.dumps({
             'type':    'command',
-            'command': event['command'],
+            'command': event.get('command'),
             'args':    event.get('args', {}),
         }))
-        logger.info(f'Command sent to {self.agent_id}: {event["command"]}')
+        logger.info(f'Command successfully transmitted to agent {self.agent_id}: {event.get("command")}')
 
     # ── DB helpers ────────────────────────────────────────────────────────────
 
@@ -165,20 +165,22 @@ class AgentConsumer(AsyncWebsocketConsumer):
     def _mark_task_running(self, task_id_str: str) -> None:
         """
         Transition the ModuleTask identified by task_id_str from
-        DISPATCHED → RUNNING. Called when the agent acknowledges that
-        the plugin has started executing.
-
-        Silently ignores missing or malformed task IDs so a bad agent
-        message never crashes the consumer.
+        DISPATCHED → RUNNING.
         """
         from .models import ModuleTask
         try:
-            task = ModuleTask.objects.get(task_id=task_id_str)
-            task.mark_running()
-        except (ModuleTask.DoesNotExist, ValueError, Exception) as exc:
-            logger.debug(
-                f"_mark_task_running: could not find task_id={task_id_str}: {exc}"
-            )
+            # Flexible resolution tracking both UUID string layouts and numeric PK variants
+            task = ModuleTask.objects.filter(task_id=task_id_str).first()
+            if not task and task_id_str.isdigit():
+                task = ModuleTask.objects.filter(id=int(task_id_str)).first()
+
+            if task:
+                task.mark_running()
+                logger.info(f"ModuleTask tracking state altered successfully to RUNNING for ID: {task_id_str}")
+            else:
+                logger.warning(f"_mark_task_running: Failed to locate target record for ID: {task_id_str}")
+        except Exception as exc:
+            logger.error(f"Error encountered adjusting lifecycle state for task reference {task_id_str}: {exc}")
 
     @staticmethod
     def _extract_token(query_string: str) -> str:

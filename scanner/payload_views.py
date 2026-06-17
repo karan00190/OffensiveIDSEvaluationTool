@@ -41,7 +41,7 @@ logger = logging.getLogger(__name__)
 
 # ── Machine-generated payload templates (mirrored from exfil_plugin.py) ──────
 _GENERATED_TEMPLATES: dict[str, bytes] = {
-    'credentials': b"username=admin&password=P@ssw0rd123&token=eyJhbGciOiJSUzI1NiJ9",
+    'credentials': b"username=admin&password=P@ssw0rd123&token=eyJhbGciOiJSUzI1NiJ9",  # b means -> raw byte formatting
     'pii':         b"name=John Doe,dob=1990-01-15,ssn=123-45-6789,email=john@example.com",
     'api_key':     b"api_key=AKIA1234567890ABCDEF&secret=wJalrXUtnFEMI/K7MDENG/bPxRfiCY",
     'db_dump':     b"id,name,email\n1,Alice,alice@ex.com\n2,Bob,bob@ex.com",
@@ -95,6 +95,8 @@ def upload_payload(request):
     uploaded = request.FILES.get('payload_file')
     name     = request.POST.get('name', '').strip()
 
+    payload_type = request.POST.get('payload_type', 'custom').strip() or 'custom' #Force a default type and prevent validation crash
+
     if not uploaded:
         return JsonResponse({'error': 'No file attached to request.'}, status=400)
 
@@ -116,6 +118,7 @@ def upload_payload(request):
     payload = ExfilPayload.objects.create(
         name            = name or uploaded.name,
         source_type     = PayloadSource.MANUAL,
+        payload_type = payload_type,
         created_by      = request.user,
         uploaded_file   = uploaded,
         file_size       = uploaded.size,

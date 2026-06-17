@@ -61,7 +61,6 @@ class Orchestrator:
         self.plugins = PluginLoader(telemetry_queue=self.telemetry.queue)
         self.ws_thread: WebSocketThread | None = None
         self._active_tasks: dict[str, asyncio.Task] = {}
-        self._loop: asyncio.AbstractEventLoop | None = None   # set in start()
 
     # =========================================================================
     # STARTUP
@@ -69,11 +68,6 @@ class Orchestrator:
 
     async def start(self) -> None:
         self._running = True
-        # Store the running loop NOW — while we are inside the async context.
-        # _on_ws_command is called from a background daemon thread where
-        # asyncio.get_event_loop() returns the WRONG loop on Python 3.10+.
-        self._loop = asyncio.get_event_loop()
-
         logger.info("=" * 56)
         logger.info("  MIAT Orchestrator starting")
         logger.info(f"  Agent ID : {self.config.agent_id}")
@@ -81,7 +75,7 @@ class Orchestrator:
         logger.info(f"  Security : mTLS + JWT + HMAC")
         logger.info("=" * 56)
 
-        loop = self._loop
+        loop = asyncio.get_event_loop()
         await loop.run_in_executor(None, self.transport.authenticate)
 
         count = self.plugins.load_all()
@@ -142,14 +136,10 @@ class Orchestrator:
     # =========================================================================
 
     def _on_ws_command(self, data: dict) -> None:
-        """
-        Bridge from WebSocketThread (daemon thread, sync) into the main
-        asyncio event loop.  Must use the loop reference stored in start()
-        because asyncio.get_event_loop() from a non-async thread returns the
-        wrong loop on Python 3.10+ and raises RuntimeError on 3.12+.
-        """
+        """Bridge from WS thread (sync) into the asyncio event loop."""
+        loop = asyncio.get_event_loop()
         asyncio.run_coroutine_threadsafe(
-            self.dispatch_command(data), self._loop,
+            self.dispatch_command(data), loop,
         )
 
     async def dispatch_command(self, data: dict) -> None:

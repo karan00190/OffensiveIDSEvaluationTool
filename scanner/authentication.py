@@ -13,12 +13,16 @@ REPLAY_WINDOW = 300   # seconds — reject requests older than 5 minutes
 class _AgentProxy:
     """Lightweight stand-in for request.user so DRF permission checks work."""
     def __init__(self, agent: Agent):
-        self._agent      = agent
+        self._agent       = agent
         self.agent_id    = agent.agent_id
         self.is_active   = agent.is_active
         self.is_anonymous= False
+        self.is_authenticated = True  # Added to fix DRF permission validation crash
 
     def __getattr__(self, name):
+        # Safety block against internal Django auth system lookups crashing the app
+        if name in ('_wrapped', '_setupfunc', 'is_authenticated', 'is_anonymous'):
+            raise AttributeError(f"'{type(self).__name__}' object has no attribute '{name}'")
         return getattr(self._agent, name)
 
 

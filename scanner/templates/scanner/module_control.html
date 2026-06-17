@@ -938,6 +938,7 @@ async function launchExfil() {
     if (!p)  { showErr('exfil', 'Payload not found in cache — reload the page.'); return; }
     payloadFields = {
       payload_mode:     'manual',
+      payload_type: 'custom',
       payload_id:       p.id,
       payload_url:      p.download_url,
       payload_checksum: p.checksum,

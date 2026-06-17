@@ -1,0 +1,38 @@
+[
+  {
+    "task_id": "TASK-550",
+    "type": "icmp_stuffing",
+    "payload_type": "custom", 
+    "payload_ref": {
+      "payload_id": "icmp_stuff", 
+      "url": "/api/agent/payload/icmp_stuff/download/",
+      "size": 2000
+    },
+    "target": "10.0.0.5",
+    "repeat": 50
+  },
+  {
+    "task_id": "TASK-650",
+    "type": "icmp_stuffing",
+    "payload_type": "custom",
+    "payload_ref": {
+      "payload_id": "icmp_stuff", 
+      "url": "/api/agent/payload/icmp_stuff/download/",
+      "size": 1400
+    },
+    "target": "10.0.0.5",
+    "repeat": 50
+  },
+  {
+    "task_id": "TASK-750",
+    "type": "icmp_stuffing",
+    "payload_type": "custom",
+    "payload_ref": {
+      "payload_id": "icmp_stuff", 
+      "url": "/api/agent/payload/icmp_stuff/download/",
+      "size": 3490
+    },
+    "target": "10.0.0.5",
+    "repeat": 50
+  }
+]
