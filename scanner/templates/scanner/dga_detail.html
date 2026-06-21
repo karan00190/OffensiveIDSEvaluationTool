@@ -190,7 +190,7 @@
 </style>
 
 {% endblock %} {% block content %}
-<div style="max-width: 1100px">
+<div>
   <!-- Header -->
   <div
     style="
@@ -235,9 +235,19 @@
         {% endif %}
       </div>
     </div>
-    <a href="{% url 'scanner:dga_dashboard' %}" class="btn btn-outline">
-      <i class="bi bi-arrow-left"></i> All DGA Runs
-    </a>
+    <div style="display:flex;gap:.5rem">
+      <a href="{% url 'scanner:export_dga' result.pk %}?format=csv"
+         class="btn btn-outline" style="font-size:12px">
+        <i class="bi bi-filetype-csv"></i> CSV
+      </a>
+      <a href="{% url 'scanner:export_dga' result.pk %}?format=pdf"
+         class="btn btn-outline" style="font-size:12px">
+        <i class="bi bi-filetype-pdf"></i> PDF
+      </a>
+      <a href="{% url 'scanner:dga_dashboard' %}" class="btn btn-outline">
+        <i class="bi bi-arrow-left"></i> All DGA Runs
+      </a>
+    </div>
   </div>
 
   <!-- IDS Detection Banner -->
@@ -707,23 +717,22 @@
             Detection signals
           </div>
           <div>
-            <span style="color: var(--cyan)">NXDOMAIN ratio:</span> {{
-            result.nxdomain_ratio|floatformat:2 }} {% if result.nxdomain_ratio
-            >= 0.8 %} <span style="color: var(--red)">← very high</span>{% endif
-            %}
+            <span style="color: var(--cyan)">NXDOMAIN ratio:</span>
+            {{ result.nxdomain_ratio|floatformat:2 }}
+            {% if result.nxdomain_ratio >= 0.8 %}<span style="color: var(--red)">← very high</span>{% endif %}
           </div>
           <div>
-            <span style="color: var(--cyan)">Entropy avg:</span> {{
-            result.avg_entropy }} {% if result.avg_entropy >= 3.5 %}
-            <span style="color: var(--red)">← suspicious</span>{% endif %}
+            <span style="color: var(--cyan)">Entropy avg:</span>
+            {{ result.avg_entropy }}
+            {% if result.avg_entropy >= 3.5 %}<span style="color: var(--red)">← suspicious</span>{% endif %}
           </div>
           <div>
-            <span style="color: var(--cyan)">Burst rate:</span> {{
-            result.rate_per_sec }}/s
+            <span style="color: var(--cyan)">Burst rate:</span>
+            {{ result.rate_per_sec }}/s
           </div>
           <div>
-            <span style="color: var(--cyan)">Total queries:</span> {{
-            result.total_queries }}
+            <span style="color: var(--cyan)">Total queries:</span>
+            {{ result.total_queries }}
           </div>
           <div
             style="

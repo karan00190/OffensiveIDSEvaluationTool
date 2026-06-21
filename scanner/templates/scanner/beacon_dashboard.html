@@ -1,0 +1,128 @@
+<!-- scanner/templates/scanner/beacon_dashboard.html -->
+{% extends "scanner/base.html" %}
+{% block title %}C2 Beacon Dashboard{% endblock %}
+
+{% block content %}
+<div>
+
+  <!-- Page header -->
+  <div style="display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:1.5rem;flex-wrap:wrap;gap:1rem">
+    <div>
+      <div style="font-family:var(--mono);font-size:10px;letter-spacing:2px;color:var(--text-dim);text-transform:uppercase;margin-bottom:6px;display:flex;align-items:center;gap:8px">
+        <span style="width:24px;height:1px;background:var(--cyan-dim);display:inline-block"></span>
+        Attack Simulation
+      </div>
+      <div style="font-family:var(--cond);font-size:28px;font-weight:700;letter-spacing:2px">C2 Beacon Suite</div>
+      <div style="font-family:var(--mono);font-size:11px;color:var(--text-dim);margin-top:4px">
+        PERIODIC CALL-HOME &nbsp;·&nbsp; HTTP &amp; DNS &nbsp;·&nbsp; JITTER &amp; ENCODING
+      </div>
+    </div>
+    <a href="{% url 'scanner:module_control' %}" class="btn btn-primary">
+      <i class="bi bi-play-fill"></i> Launch Beacon
+    </a>
+  </div>
+
+  <!-- Stats row -->
+  <div class="stat-grid" style="grid-template-columns:repeat(4,1fr);margin-bottom:1.5rem">
+    <div class="stat-card">
+      <div class="stat-label">Total Runs</div>
+      <div class="stat-value">{{ total_runs }}</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">IDS Detected</div>
+      <div class="stat-value" style="color:var(--red)">{{ detected_runs }}</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Evaded IDS</div>
+      <div class="stat-value" style="color:var(--green)">{{ evaded_runs }}</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Unverified</div>
+      <div class="stat-value" style="color:var(--amber)">{{ unknown_runs }}</div>
+    </div>
+  </div>
+
+  <!-- Results table -->
+  <div class="section-header">
+    <div class="section-title">Beacon Campaigns</div>
+    <span style="font-family:var(--mono);font-size:10px;color:var(--text-dim)">
+      {{ total_runs }} RUN{{ total_runs|pluralize:"S" }}
+    </span>
+  </div>
+
+  <div class="card">
+    {% if results %}
+    <div style="overflow-x:auto">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Session</th>
+            <th>Protocol</th>
+            <th>Encoding</th>
+            <th>Target</th>
+            <th>Sent</th>
+            <th>Avg Latency</th>
+            <th>Jitter</th>
+            <th>IDS Status</th>
+            <th>Date</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for r in results %}
+          <tr>
+            <td class="mono" style="color:var(--cyan)">{{ r.pk }}</td>
+            <td class="mono" style="font-size:11px;color:var(--text-sec)">{{ r.session_id }}</td>
+            <td>
+              {% if r.protocol == 'http_get' %}
+                <span class="sev sev-INFO">HTTP GET</span>
+              {% elif r.protocol == 'http_post' %}
+                <span class="sev sev-MEDIUM">HTTP POST</span>
+              {% else %}
+                <span class="sev sev-NONE">DNS</span>
+              {% endif %}
+            </td>
+            <td class="mono" style="font-size:11px">{{ r.encoding|upper }}</td>
+            <td class="mono" style="font-size:11px;color:var(--text-sec)">{{ r.target }}</td>
+            <td class="mono" style="font-size:11px">
+              <span style="color:{% if r.failed == 0 %}var(--green){% else %}var(--amber){% endif %}">
+                {{ r.successful }}/{{ r.total_beacons }}
+              </span>
+            </td>
+            <td class="mono" style="font-size:11px">{{ r.avg_latency_ms|floatformat:0 }} ms</td>
+            <td class="mono" style="font-size:11px">±{{ r.jitter_pct }}%</td>
+            <td>
+              {% if r.ids_detected is None %}
+                <span class="sev sev-NONE">Unknown</span>
+              {% elif r.ids_detected %}
+                <span class="sev sev-HIGH">Detected</span>
+              {% else %}
+                <span class="sev sev-INFO" style="--sev-color:var(--green)">Evaded</span>
+              {% endif %}
+            </td>
+            <td class="mono" style="font-size:10px;color:var(--text-dim)">
+              {{ r.created_at|date:"Y-m-d H:i" }}
+            </td>
+            <td>
+              <a href="{% url 'scanner:beacon_detail' r.pk %}"
+                 style="font-family:var(--mono);font-size:10px;color:var(--cyan-dim)">
+                Detail →
+              </a>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div style="text-align:center;padding:5rem 2rem;font-family:var(--mono);font-size:12px;color:var(--text-dim)">
+      <i class="bi bi-broadcast" style="font-size:40px;display:block;margin-bottom:1rem;color:var(--border-md)"></i>
+      No beacon campaigns yet.
+      <a href="{% url 'scanner:module_control' %}" style="color:var(--cyan)">Launch one →</a>
+    </div>
+    {% endif %}
+  </div>
+
+</div>
+{% endblock %}

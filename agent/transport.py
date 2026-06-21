@@ -284,7 +284,7 @@ class SecureTransport:
                 'X-Agent-ID':    self._agent_id,
                 'X-Timestamp':   ts,
                 'X-Signature':   sig,
-                'Accept':        'application/octet-stream',
+                'Accept':        '*/*',
             },
             method  = 'GET',
         )

@@ -1,0 +1,15 @@
+=== API CREDENTIALS (ROTATE IMMEDIATELY) ===
+AWS_ACCESS_KEY_ID=AKIAIOSFODNN7EXAMPLE
+AWS_SECRET_ACCESS_KEY=wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY
+AWS_REGION=us-east-1
+
+STRIPE_SECRET_KEY=sk_live_4eC39HqLyjWDarjtT1zdp7dc
+STRIPE_WEBHOOK_SECRET=whsec_xxxxxxxxxxxxxxxxxxx
+
+GITHUB_TOKEN=ghp_aBcDeFgHiJkLmNoPqRsTuVwXyZ123456
+GITHUB_ORG=barc-security
+
+SENDGRID_API_KEY=SG.xxxxx.yyyyyy
+DATABASE_URL=postgresql://admin:SuperSecret@db.internal:5432/proddb
+REDIS_URL=redis://:RedisPass123@cache.internal:6379/0
+JWT_SECRET=mY$uP3rS3cr3tJWTk3y!2024

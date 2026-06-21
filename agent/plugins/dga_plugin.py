@@ -126,6 +126,8 @@ class DGAPlugin(MIATPlugin):
         results    = []
         nxdomain   = 0
         resolved   = 0
+        timeouts   = 0
+        errors     = 0
         start_time = time.time()
 
         for i, domain in enumerate(domains, start=1):
@@ -141,6 +143,10 @@ class DGAPlugin(MIATPlugin):
                 nxdomain += 1
             elif outcome == 'RESOLVED':
                 resolved += 1
+            elif outcome == 'TIMEOUT':
+                timeouts += 1
+            else:
+                errors += 1
 
             results.append({
                 'domain':    domain,
@@ -166,6 +172,8 @@ class DGAPlugin(MIATPlugin):
             'total_queries':  len(results),
             'nxdomain':       nxdomain,
             'resolved':       resolved,
+            'timeout':        timeouts,
+            'errors':         errors,
             'nxdomain_ratio': ratio,
             'avg_entropy':    round(sum(entropies) / len(entropies), 3) if entropies else 0,
             'max_entropy':    max(entropies) if entropies else 0,

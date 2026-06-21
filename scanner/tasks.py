@@ -115,7 +115,7 @@ def run_scan_task(scan_pk: int) -> None:
             host_row = HostResult.objects.create(
                 scan        = scan,
                 ip_address  = host_ip,
-                hostname    = next(iter(host_data.hostname() or []), ''),
+                hostname    = host_data.hostname() or '',
                 status      = host_status,
                 os_detected = os_name,
                 os_accuracy = os_acc,

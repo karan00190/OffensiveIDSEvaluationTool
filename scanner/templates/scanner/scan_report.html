@@ -158,6 +158,14 @@
     </div>
   </div>
   <div class="report-actions">
+    <a href="{% url 'scanner:export_scan' source_scan.pk %}?format=csv"
+       class="btn btn-outline" style="font-size:12px">
+      <i class="bi bi-filetype-csv"></i> CSV
+    </a>
+    <a href="{% url 'scanner:export_scan' source_scan.pk %}?format=pdf"
+       class="btn btn-outline" style="font-size:12px">
+      <i class="bi bi-filetype-pdf"></i> PDF
+    </a>
     <a href="{% url 'scanner:dashboard' %}" class="btn btn-outline">
       <i class="bi bi-arrow-left"></i> Back
     </a>

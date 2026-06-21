@@ -7,11 +7,11 @@ from rest_framework.response        import Response
 from rest_framework                 import status
 
 from .authentication import AgentAuthentication
-from .models         import Agent, ScanRequest, ScanProfile, ScanStatus
+from .models         import Agent, ScanRequest, ScanProfile, ScanStatus, HostResult, PortFinding, Severity
 from .jwt_auth       import create_access_token, create_refresh_token
 
 logger  = logging.getLogger('MIAT.AgentViews')
-REG_KEY = getattr(settings, 'MIAT_REGISTRATION_KEY', 'changeme-set-in-settings')
+REG_KEY = getattr(settings, 'AGENT_REGISTRATION_KEY', 'change-this-to-something-strong')
 
 
 # =============================================================================
@@ -173,7 +173,6 @@ def agent_post_results(request):
     """
     plugin  = request.data.get('plugin', 'unknown')
     success = request.data.get('success', True)
-    data    = request.data.get('data', {})
 
     logger.info(
         f"Result received from agent {request.user.agent_id}: "
@@ -199,7 +198,10 @@ def agent_poll_commands(request):
     from .models import ModuleTask, TaskStatus
     pending = (
         ModuleTask.objects
-        .filter(agent__agent_id=request.user.agent_id, status=TaskStatus.PENDING)
+        .filter(
+            agent__agent_id=request.user.agent_id,
+            status__in=[TaskStatus.PENDING, TaskStatus.DISPATCHED],
+        )
         .values('task_id', 'module', 'config_json')
         .order_by('dispatched_at')[:5]
     )
@@ -213,3 +215,142 @@ def agent_poll_commands(request):
         })
 
     return Response({'commands': commands, 'count': len(commands)})
+
+
+# =============================================================================
+# NMAP RESULT INGESTION
+# POST /api/agent/nmap/results/
+# =============================================================================
+
+_NMAP_SEV_MAP = {
+    'HIGH':   Severity.HIGH,
+    'MEDIUM': Severity.MEDIUM,
+    'LOW':    Severity.LOW,
+    'INFO':   Severity.INFO,
+    'NONE':   Severity.NONE,
+}
+
+_NMAP_CRITICAL_PORTS = {21, 23, 445, 3306, 3389, 6379, 27017}
+
+
+@api_view(['POST'])
+@authentication_classes([AgentAuthentication])
+@permission_classes([IsAuthenticated])
+def api_nmap_results(request):
+    """
+    Agent posts nmap scan summary here after nmap_plugin.py finishes.
+    Creates ScanRequest + HostResult + PortFinding rows, then closes
+    the ModuleTask loop so the browser redirects automatically.
+
+    POST body matches nmap_plugin.py summary dict:
+    {
+        "task_id":             "<uuid>",
+        "target":              "192.168.1.0/24",
+        "profile":             "fast",
+        "total_hosts":         3,
+        "hosts_up":            2,
+        "total_open_ports":    8,
+        "high_severity_count": 2,
+        "overall_risk":        "HIGH",
+        "hosts": [
+            {
+                "ip":          "192.168.1.1",
+                "hostname":    "gateway.local",
+                "status":      "up",
+                "os_detected": "Linux 5.x",
+                "host_risk":   "MEDIUM",
+                "open_count":  3,
+                "ports": [
+                    { "port":22,"protocol":"tcp","state":"open",
+                      "service":"ssh","product":"OpenSSH","version":"8.4",
+                      "severity":"MEDIUM","risk_note":"SSH exposed","is_critical":false }
+                ]
+            }
+        ]
+    }
+    """
+    from django.utils import timezone
+    from .dga_views import _close_moduletask_loop
+
+    data = request.data
+
+    # If the orchestrator sent a failure report, mark the task failed and return.
+    if data.get('error'):
+        _close_moduletask_loop(
+            task_id_str=str(data.get('task_id', '')),
+            result_pk=0,
+            module='nmap',
+            failed=True,
+            error_message=str(data['error']),
+        )
+        return Response({'received': True, 'error': data['error']}, status=200)
+
+    try:
+        agent = Agent.objects.get(agent_id=request.user.agent_id)
+    except Agent.DoesNotExist:
+        agent = None
+
+    profile_map = {
+        'fast':    ScanProfile.FAST,
+        'default': ScanProfile.DEFAULT,
+        'deep':    ScanProfile.DEEP,
+        'ping':    ScanProfile.PING,
+    }
+
+    scan = ScanRequest.objects.create(
+        target                = data.get('target', ''),
+        scan_profile          = profile_map.get(data.get('profile', 'default'), ScanProfile.DEFAULT),
+        agent                 = agent,
+        status                = ScanStatus.COMPLETE,
+        started_at            = timezone.now(),
+        completed_at          = timezone.now(),
+        total_hosts           = data.get('total_hosts', 0),
+        hosts_up              = data.get('hosts_up', 0),
+        total_open_ports      = data.get('total_open_ports', 0),
+        high_severity_count   = data.get('high_severity_count', 0),
+        overall_risk          = _NMAP_SEV_MAP.get(data.get('overall_risk', 'NONE'), Severity.NONE),
+    )
+
+    for host in data.get('hosts', []):
+        host_row = HostResult.objects.create(
+            scan        = scan,
+            ip_address  = host.get('ip', ''),
+            hostname    = host.get('hostname', ''),
+            status      = host.get('status', 'unknown'),
+            os_detected = host.get('os_detected', 'N/A'),
+            os_accuracy = 0,
+            open_port_count = host.get('open_count', 0),
+            host_risk   = _NMAP_SEV_MAP.get(host.get('host_risk', 'NONE'), Severity.NONE),
+        )
+        for port in host.get('ports', []):
+            sev = _NMAP_SEV_MAP.get(port.get('severity', 'INFO'), Severity.INFO)
+            PortFinding.objects.create(
+                host              = host_row,
+                port              = port.get('port', 0),
+                protocol          = port.get('protocol', 'tcp'),
+                state             = port.get('state', 'open'),
+                service_name      = port.get('service', ''),
+                service_product   = port.get('product', ''),
+                service_version   = port.get('version', ''),
+                severity          = sev,
+                risk_note         = port.get('risk_note', ''),
+                is_critical_alert = port.get('is_critical', port.get('port', 0) in _NMAP_CRITICAL_PORTS),
+                alert_message     = port.get('risk_note', '') if port.get('is_critical') else '',
+            )
+
+    logger.info(
+        f"Nmap results saved: scan #{scan.pk} "
+        f"target={scan.target} hosts={scan.hosts_up}/{scan.total_hosts} "
+        f"open={scan.total_open_ports} risk={scan.overall_risk}"
+    )
+
+    _close_moduletask_loop(
+        task_id_str=str(data.get('task_id', '')),
+        result_pk=scan.pk,
+        module='nmap',
+    )
+
+    return Response({
+        'scan_id': scan.pk,
+        'message': f'Nmap results saved (scan #{scan.pk})',
+    }, status=status.HTTP_201_CREATED)

@@ -11,7 +11,7 @@ from .models   import Agent
 
 logger = logging.getLogger('MIAT.TokenViews')
 
-REG_KEY = getattr(settings, 'MIAT_REGISTRATION_KEY', 'change-this-to-something-strong')
+REG_KEY = getattr(settings, 'AGENT_REGISTRATION_KEY', 'change-this-to-something-strong')
 
 
 @api_view(['POST'])
@@ -83,7 +83,7 @@ def verify_token_view(request):
     token = request.data.get('token', '').strip()
     payload = verify_token(token)
     if not payload:
-        return Response({'valid': False}, status=200)
+        return Response({'valid': False}, status=401)
     return Response({
         'valid':    True,
         'agent_id': payload.get('agent_id'),

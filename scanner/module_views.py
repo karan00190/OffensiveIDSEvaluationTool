@@ -388,7 +388,7 @@ def dispatch_exfil_task(request):
         )
 
     # ── Validate technique ──────────────────────────────────────────────────
-    VALID_TECHNIQUES = {'dns', 'http', 'icmp'}
+    VALID_TECHNIQUES = {'dns', 'http', 'icmp', 'sqli'}
     technique = str(body.get('technique', '')).strip().lower()
     if technique not in VALID_TECHNIQUES:
         return JsonResponse(
@@ -415,10 +415,15 @@ def dispatch_exfil_task(request):
             status=400,
         )
 
-    # ── Validate payload_type ───────────────────────────────────────────────
+    # ── Payload mode (generated vs manual pull) ─────────────────────────────
+    payload_mode = str(body.get('payload_mode', 'generated')).strip().lower()
+    if payload_mode not in ('generated', 'manual'):
+        payload_mode = 'generated'
+
+    # ── Validate payload_type (only required for generated mode) ────────────
     VALID_PAYLOADS = {'credentials', 'pii', 'api_key', 'db_dump', 'config', 'custom'}
     payload_type = str(body.get('payload_type', '')).strip().lower()
-    if payload_type not in VALID_PAYLOADS:
+    if payload_mode == 'generated' and payload_type not in VALID_PAYLOADS:
         return JsonResponse(
             {
                 'error': (
@@ -428,6 +433,12 @@ def dispatch_exfil_task(request):
             },
             status=400,
         )
+
+    # ── Manual pull-model payload fields ────────────────────────────────────
+    payload_url      = str(body.get('payload_url',      '')).strip()
+    payload_checksum = str(body.get('payload_checksum', '')).strip()
+    payload_size     = int(body.get('payload_size',     0) or 0)
+    payload_id       = body.get('payload_id')
 
     # ── Validate target ─────────────────────────────────────────────────────
     target = str(body.get('target', '')).strip()
@@ -474,26 +485,34 @@ def dispatch_exfil_task(request):
     dns_domain = str(body.get('dns_domain', 'exfil-test.local')).strip() or 'exfil-test.local'
     dns_server = str(body.get('dns_server', '')).strip() or None
 
-    # Build HTTP target from the target field if not explicitly provided.
-    # exfil_plugin.py needs a full URL for HTTP injection.
+    sqli_param   = str(body.get('sqli_param',   'id')).strip() or 'id'
+    sqli_columns = int(body.get('sqli_columns', 3))
+    if sqli_columns < 1 or sqli_columns > 20:
+        sqli_columns = 3
+
+    # Build HTTP target URL
     http_target = str(body.get('http_target', '')).strip()
     if not http_target:
         http_target = target if target.startswith('http') else f'http://{target}'
 
-    # ── Build plugin-compatible config dict ────────────────────────────────
-    # Keys match what exfil_plugin.py reads from args in execute().
     config_json = {
-        'technique':     technique,
-        'profile':       profile,
-        'target':        target,
-        'payload_type':  payload_type,
-        'payload':       '',           # custom payload string; empty = use template
-        'dns_domain':    dns_domain,
-        'dns_server':    dns_server,
-        'http_target':   http_target,
-        'drip_interval': drip_interval,
-        'jitter_min':    jitter_min,
-        'jitter_max':    jitter_max,
+        'technique':        technique,
+        'profile':          profile,
+        'target':           target,
+        'payload_mode':     payload_mode,
+        'payload_type':     payload_type,
+        'payload_url':      payload_url,
+        'payload_checksum': payload_checksum,
+        'payload_size':     payload_size,
+        'payload_id':       payload_id,
+        'dns_domain':       dns_domain,
+        'dns_server':       dns_server,
+        'http_target':      http_target,
+        'drip_interval':    drip_interval,
+        'jitter_min':       jitter_min,
+        'jitter_max':       jitter_max,
+        'sqli_param':       sqli_param,
+        'sqli_columns':     sqli_columns,
     }
 
     # ── Create the tracking record ──────────────────────────────────────────

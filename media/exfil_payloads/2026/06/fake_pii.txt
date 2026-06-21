@@ -1,0 +1,14 @@
+EMPLOYEE RECORDS - CONFIDENTIAL
+================================
+Name: John Smith | DOB: 1985-03-22 | SSN: 123-45-6789
+Email: john.smith@company.com | Phone: +1-555-0147
+Address: 42 Maple Street, Austin TX 78701
+Salary: $95,000 | Dept: Engineering | EmpID: EMP-00847
+
+Name: Sarah Connor | DOB: 1990-07-14 | SSN: 987-65-4321
+Email: s.connor@company.com | Phone: +1-555-0293
+Address: 17 Oak Avenue, Denver CO 80201
+Salary: $112,000 | Dept: Security | EmpID: EMP-01203
+
+CreditCard: 4532-1234-5678-9012 | CVV: 847 | Exp: 09/26
+Bank: Chase | Account: 00847291 | Routing: 021000021

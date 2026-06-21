@@ -184,6 +184,7 @@
         font-family: var(--mono); font-size: 11px; color: var(--text-dim);
         text-decoration: none; padding: 5px 8px;
         border-radius: 4px; transition: color .2s;
+        background: none; border: none; cursor: pointer;
       }
       .logout-link:hover { color: var(--red); }
 
@@ -385,7 +386,7 @@
       <div class="nav-links">
         <a href="{% url 'scanner:dashboard' %}"
            class="nav-link {% if page == 'dashboard' %}active{% endif %}">
-          <i class="bi bi-grid-1x2"></i> Dashboard
+          <i class="bi bi-grid-1x2"></i> Scan Dashboard
         </a>
         <a href="{% url 'scanner:submit_scan' %}"
            class="nav-link {% if page == 'scan' %}active{% endif %}">
@@ -397,30 +398,33 @@
         </a>
         <a href="{% url 'scanner:dga_dashboard' %}"
            class="nav-link {% if page == 'dga' %}active{% endif %}">
-          <i class="bi bi-diagram-3"></i> DGA
+          <i class="bi bi-diagram-3"></i> DGA Suite
         </a>
         <a href="{% url 'scanner:exfil_dashboard' %}"
            class="nav-link {% if page == 'exfil' %}active{% endif %}">
-          <i class="bi bi-arrow-up-right-circle"></i> Exfil
+          <i class="bi bi-arrow-up-right-circle"></i> Exfil Suite
         </a>
-        <!-- ── NEW: Module orchestration control panel ─────── -->
+        <a href="{% url 'scanner:beacon_dashboard' %}"
+           class="nav-link {% if page == 'beacon' %}active{% endif %}">
+          <i class="bi bi-broadcast"></i> Beacon Suite
+        </a>
         <a href="{% url 'scanner:module_control' %}"
            class="nav-link launch-link {% if page == 'modules' %}active{% endif %}">
-          <i class="bi bi-terminal"></i> Launch
+          <i class="bi bi-terminal"></i> Module Launch
         </a>
       </div>
 
       <div class="nav-right">
-        <a href="{% url 'scanner:submit_scan' %}" class="btn-scan">
-          <i class="bi bi-plus"></i> Launch Scan
-        </a>
         <div class="user-chip">
           <div class="user-dot"></div>
           {{ user.username }}
         </div>
-        <a href="{% url 'logout' %}" class="logout-link">
-          <i class="bi bi-box-arrow-right"></i>
-        </a>
+        <form method="post" action="{% url 'logout' %}" style="margin:0;display:inline;">
+          {% csrf_token %}
+          <button type="submit" class="logout-link" title="Logout">
+            <i class="bi bi-box-arrow-right"></i>
+          </button>
+        </form>
       </div>
       {% endif %}
     </nav>

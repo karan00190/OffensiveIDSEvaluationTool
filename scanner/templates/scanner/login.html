@@ -5,8 +5,8 @@
 {% block extra_css %}
 <style>
 .login-wrap {
-  min-height: calc(100vh - 56px);
-  display: flex; align-items: center; justify-content: center;
+  width: 100%;
+  max-width: 440px;
   position: relative;
 }
 
@@ -139,50 +139,52 @@
 
 
 {% block content %}
-<div class="login-wrap">
-  <div class="login-panel">
-    <div class="login-glow"></div>
+<div style="min-height:calc(100vh - 56px);display:flex;align-items:center;justify-content:center;padding:1.5rem">
+  <div class="login-wrap">
+    <div class="login-panel">
+      <div class="login-glow"></div>
 
-    <div class="login-header">
-      <div class="login-logo"><i class="bi bi-shield-lock"></i></div>
-      <div class="login-title">MIAT</div>
-      <div class="login-subtitle">MALWARE IMPACT ASSESSMENT TOOL</div>
-    </div>
-
-    <div class="login-box">
-      {% if form.errors %}
-      <div class="error-msg">
-        <i class="bi bi-exclamation-octagon"></i>
-        Authentication failed — invalid credentials
+      <div class="login-header">
+        <div class="login-logo"><i class="bi bi-shield-lock"></i></div>
+        <div class="login-title">MIAT</div>
+        <div class="login-subtitle">MALWARE IMPACT ASSESSMENT TOOL</div>
       </div>
-      {% endif %}
 
-      <form method="post">
-        {% csrf_token %}
-        <div class="field-group">
-          <label class="field-label">Username</label>
-          <div class="field-wrap">
-            <input type="text" name="username" class="field-input"
-                   placeholder="Enter username" autofocus autocomplete="username">
-            <i class="bi bi-person field-icon"></i>
-          </div>
+      <div class="login-box">
+        {% if form.errors %}
+        <div class="error-msg">
+          <i class="bi bi-exclamation-octagon"></i>
+          Authentication failed — invalid credentials
         </div>
-        <div class="field-group">
-          <label class="field-label">Password</label>
-          <div class="field-wrap">
-            <input type="password" name="password" class="field-input"
-                   placeholder="••••••••" autocomplete="current-password">
-            <i class="bi bi-key field-icon"></i>
-          </div>
-        </div>
-        <button type="submit" class="btn-login">
-          <i class="bi bi-shield-check"></i> Authenticate
-        </button>
-      </form>
-    </div>
+        {% endif %}
 
-    <div class="login-footer">
-      AUTHORIZED ACCESS ONLY &nbsp;·&nbsp; ALL SESSIONS LOGGED
+        <form method="post">
+          {% csrf_token %}
+          <div class="field-group">
+            <label class="field-label">Username</label>
+            <div class="field-wrap">
+              <input type="text" name="username" class="field-input"
+                     placeholder="Enter username" autofocus autocomplete="username">
+              <i class="bi bi-person field-icon"></i>
+            </div>
+          </div>
+          <div class="field-group">
+            <label class="field-label">Password</label>
+            <div class="field-wrap">
+              <input type="password" name="password" class="field-input"
+                     placeholder="••••••••" autocomplete="current-password">
+              <i class="bi bi-key field-icon"></i>
+            </div>
+          </div>
+          <button type="submit" class="btn-login">
+            <i class="bi bi-shield-check"></i> Authenticate
+          </button>
+        </form>
+      </div>
+
+      <div class="login-footer">
+        AUTHORIZED ACCESS ONLY &nbsp;·&nbsp; ALL SESSIONS LOGGED
+      </div>
     </div>
   </div>
 </div>

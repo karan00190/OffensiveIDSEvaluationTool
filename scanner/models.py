@@ -62,6 +62,7 @@ class ExfilTechnique(models.TextChoices):
     DNS  = 'dns',  'DNS Tunnelling'
     HTTP = 'http', 'HTTP Header Injection'
     ICMP = 'icmp', 'ICMP Payload Stuffing'
+    SQLI = 'sqli', 'SQL Injection Exfiltration'
 
 
 class ExfilProfile(models.TextChoices):
@@ -77,12 +78,13 @@ class PayloadSource(models.TextChoices):
 
 class ModuleChoice(models.TextChoices):
     """
-    The three attack modules that can be dispatched from the web UI.
+    The attack modules that can be dispatched from the web UI.
     Used by ModuleTask to record which plugin was invoked.
     """
-    DGA   = 'dga',   'DGA Simulation'
-    EXFIL = 'exfil', 'Data Exfiltration'
-    NMAP  = 'nmap',  'Nmap Reconnaissance'
+    DGA    = 'dga',    'DGA Simulation'
+    EXFIL  = 'exfil',  'Data Exfiltration'
+    NMAP   = 'nmap',   'Nmap Reconnaissance'
+    BEACON = 'beacon', 'C2 Beacon Simulation'
 
 
 class TaskStatus(models.TextChoices):
@@ -403,7 +405,56 @@ class ExfilResult(models.Model):
 
 
 # =============================================================================
-# MODEL 7: MODULE TASK
+# MODEL 7: BEACON RESULT
+# One complete C2 Beacon simulation campaign.
+# =============================================================================
+
+class BeaconResult(models.Model):
+    agent        = models.ForeignKey(
+        Agent, on_delete=models.SET_NULL,
+        null=True, blank=True, related_name='beacon_results',
+    )
+    session_id        = models.CharField(max_length=16, blank=True)
+    protocol          = models.CharField(max_length=20, default='http_get')
+    encoding          = models.CharField(max_length=20, default='base64')
+    target            = models.CharField(max_length=255, blank=True)
+    total_beacons     = models.IntegerField(default=0)
+    successful        = models.IntegerField(default=0)
+    failed            = models.IntegerField(default=0)
+    interval_sec      = models.FloatField(default=60.0)
+    jitter_pct        = models.IntegerField(default=10)
+    avg_latency_ms    = models.FloatField(default=0.0)
+    std_dev_sec       = models.FloatField(default=0.0)
+    ids_detected      = models.BooleanField(null=True, blank=True)
+    ids_detection_notes = models.TextField(blank=True, default='')
+    ids_signatures    = models.JSONField(default=list)
+    beacons_json      = models.JSONField(default=list)
+    created_at        = models.DateTimeField(auto_now_add=True)
+
+    @property
+    def success_rate(self) -> float:
+        if self.total_beacons == 0:
+            return 0.0
+        return round(self.successful / self.total_beacons, 4)
+
+    @property
+    def ids_status(self) -> str:
+        if self.ids_detected is None:
+            return 'Unknown'
+        return 'Detected' if self.ids_detected else 'Evaded'
+
+    def __str__(self):
+        return (f"Beacon [{self.protocol}/{self.encoding}] "
+                f"{self.successful}/{self.total_beacons} sent → {self.target}")
+
+    class Meta:
+        ordering            = ['-created_at']
+        verbose_name        = 'Beacon Result'
+        verbose_name_plural = 'Beacon Results'
+
+
+# =============================================================================
+# MODEL 8: MODULE TASK
 # Tracks a single web-initiated dispatch of any attack plugin.
 #
 # WHY THIS EXISTS:
@@ -422,9 +473,10 @@ class ExfilResult(models.Model):
 #   ForeignKey. Because DGA and Exfil results live in separate tables,
 #   using a GenericForeignKey would add complexity for little benefit at
 #   this scale. The module field tells you which table result_pk points into:
-#     module='dga'   → DGAResult.objects.get(pk=result_pk)
-#     module='exfil' → ExfilResult.objects.get(pk=result_pk)
-#     module='nmap'  → ScanRequest.objects.get(pk=result_pk)
+#     module='dga'    → DGAResult.objects.get(pk=result_pk)
+#     module='exfil'  → ExfilResult.objects.get(pk=result_pk)
+#     module='nmap'   → ScanRequest.objects.get(pk=result_pk)
+#     module='beacon' → BeaconResult.objects.get(pk=result_pk)
 # =============================================================================
 
 class ModuleTask(models.Model):

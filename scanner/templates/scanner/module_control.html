@@ -225,14 +225,14 @@
 
 
 {% block content %}
-<div style="max-width:1200px">
+<div>
 
   <!-- ── Page header ───────────────────────────────────────────────────── -->
   <div style="display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:1.5rem;flex-wrap:wrap;gap:1rem">
     <div>
       <div class="pg-eyebrow">Orchestration</div>
       <div class="pg-title">Module Control</div>
-      <div class="pg-sub">DGA SIMULATION &nbsp;·&nbsp; DATA EXFILTRATION &nbsp;·&nbsp; REAL-TIME DISPATCH</div>
+      <div class="pg-sub">DGA SIMULATION &nbsp;·&nbsp; DATA EXFILTRATION &nbsp;·&nbsp; C2 BEACON &nbsp;·&nbsp; REAL-TIME DISPATCH</div>
     </div>
     <div style="display:flex;gap:.5rem">
       <a href="{% url 'scanner:dga_dashboard' %}" class="btn btn-outline">
@@ -240,6 +240,9 @@
       </a>
       <a href="{% url 'scanner:exfil_dashboard' %}" class="btn btn-outline">
         <i class="bi bi-arrow-up-right-circle"></i> Exfil History
+      </a>
+      <a href="{% url 'scanner:beacon_dashboard' %}" class="btn btn-outline">
+        <i class="bi bi-broadcast"></i> Beacon History
       </a>
     </div>
   </div>
@@ -289,6 +292,9 @@
         </button>
         <button class="mc-tab" data-tab="exfil" onclick="switchTab('exfil')">
           <i class="bi bi-arrow-up-right-circle"></i> Data Exfil
+        </button>
+        <button class="mc-tab" data-tab="beacon" onclick="switchTab('beacon')">
+          <i class="bi bi-broadcast"></i> C2 Beacon
         </button>
       </div>
 
@@ -355,21 +361,26 @@
           <!-- Technique cards -->
           <div class="fl">
             <label class="fl-label">Technique <span class="req">*</span></label>
-            <div class="choice-grid" style="grid-template-columns:repeat(3,1fr)">
-              <div class="choice-card c-sel" data-group="technique" data-value="dns" style="--cc:var(--cyan)" onclick="pickChoice(this)">
+            <div class="choice-grid" style="grid-template-columns:repeat(2,1fr)">
+              <div class="choice-card c-sel" data-group="technique" data-value="dns" style="--cc:var(--cyan)" onclick="pickChoice(this);onTechChange()">
                 <i class="bi bi-diagram-3 ci"></i>
                 <div class="cn">DNS Tunnel</div>
                 <div class="cs">Base32 subdomains</div>
               </div>
-              <div class="choice-card" data-group="technique" data-value="http" style="--cc:var(--amber)" onclick="pickChoice(this)">
+              <div class="choice-card" data-group="technique" data-value="http" style="--cc:var(--amber)" onclick="pickChoice(this);onTechChange()">
                 <i class="bi bi-globe ci"></i>
                 <div class="cn">HTTP Inject</div>
                 <div class="cs">Header injection</div>
               </div>
-              <div class="choice-card" data-group="technique" data-value="icmp" style="--cc:var(--red)" onclick="pickChoice(this)">
+              <div class="choice-card" data-group="technique" data-value="icmp" style="--cc:var(--red)" onclick="pickChoice(this);onTechChange()">
                 <i class="bi bi-broadcast ci"></i>
                 <div class="cn">ICMP Stuff</div>
                 <div class="cs">Payload padding</div>
+              </div>
+              <div class="choice-card" data-group="technique" data-value="sqli" style="--cc:#a855f7" onclick="pickChoice(this);onTechChange()">
+                <i class="bi bi-database-exclamation ci"></i>
+                <div class="cn">SQL Inject</div>
+                <div class="cs">UNION SELECT exfil</div>
               </div>
             </div>
           </div>
@@ -400,6 +411,50 @@
           <div class="fl">
             <label class="fl-label">Target <span class="req">*</span></label>
             <input id="exfil-target" class="fl-input" type="text" placeholder="192.168.1.1"/>
+          </div>
+
+          <!-- SQLi-specific options (shown only when sqli technique is selected) -->
+          <div id="sqli-opts" style="display:none">
+            <div class="fl">
+              <label class="fl-label">
+                Vulnerable Parameter <span class="req">*</span>
+              </label>
+              <input id="sqli-param" class="fl-input" type="text"
+                     value="id" placeholder="id"/>
+              <div class="fl-hint">
+                URL GET parameter to inject into — e.g. <code>id</code>, <code>search</code>, <code>page</code>
+              </div>
+            </div>
+            <div class="fl">
+              <label class="fl-label">
+                UNION SELECT Columns <span class="req">*</span>
+              </label>
+              <input id="sqli-columns" class="fl-input" type="number"
+                     value="3" min="1" max="20"/>
+              <div class="fl-hint">
+                Number of columns in the vulnerable query.
+                The agent auto-fills col[0]=hex_chunk col[1]=seq col[2]='MIAT-SIM'.
+              </div>
+            </div>
+            <div style="
+              background:rgba(168,85,247,.06);
+              border:1px solid rgba(168,85,247,.25);
+              border-left:3px solid #a855f7;
+              border-radius:0 6px 6px 0;
+              padding:10px 14px;
+              margin-bottom:1.25rem;
+              font-family:var(--mono);
+              font-size:10px;
+              color:rgba(168,85,247,.9);
+              line-height:1.8;
+            ">
+              <i class="bi bi-info-circle"></i>&nbsp;
+              Injection format:
+              <code style="color:#c084fc">
+                ?{param}=1 UNION SELECT '{hex_chunk}',{seq},'MIAT-SIM'-- -
+              </code><br>
+              Each 32-byte chunk is hex-encoded → 64 safe hex chars, no URL encoding needed.
+            </div>
           </div>
 
           <!-- Payload Mode Toggle -->
@@ -510,6 +565,117 @@
           </button>
         </div>
       </div><!-- /panel-exfil -->
+
+      <!-- ── Beacon Panel ─────────────────────────────────────────────── -->
+      <div id="panel-beacon" class="mc-panel">
+        <div class="card-header" style="border-bottom:1px solid var(--border)">
+          <div class="card-title"><i class="bi bi-broadcast"></i> C2 Beacon Configuration</div>
+        </div>
+        <div class="mc-panel-body">
+
+          <!-- Protocol -->
+          <div class="fl">
+            <label class="fl-label">Protocol <span class="req">*</span></label>
+            <div class="choice-grid" style="grid-template-columns:repeat(3,1fr)">
+              <div class="choice-card c-sel" data-group="bprotocol" data-value="http_get" style="--cc:var(--cyan)" onclick="pickChoice(this)">
+                <i class="bi bi-arrow-down-up ci"></i>
+                <div class="cn">HTTP GET</div>
+                <div class="cs">Query param</div>
+              </div>
+              <div class="choice-card" data-group="bprotocol" data-value="http_post" style="--cc:var(--amber)" onclick="pickChoice(this)">
+                <i class="bi bi-send ci"></i>
+                <div class="cn">HTTP POST</div>
+                <div class="cs">JSON body</div>
+              </div>
+              <div class="choice-card" data-group="bprotocol" data-value="dns" style="--cc:var(--green)" onclick="pickChoice(this)">
+                <i class="bi bi-diagram-3 ci"></i>
+                <div class="cn">DNS TXT</div>
+                <div class="cs">TXT record query</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Encoding -->
+          <div class="fl">
+            <label class="fl-label">Payload Encoding <span class="req">*</span></label>
+            <div class="choice-grid" style="grid-template-columns:repeat(3,1fr)">
+              <div class="choice-card" data-group="bencoding" data-value="plain" style="--cc:var(--text-dim)" onclick="pickChoice(this);showXorKey()">
+                <i class="bi bi-file-text ci"></i>
+                <div class="cn">Plain</div>
+                <div class="cs">No encoding</div>
+              </div>
+              <div class="choice-card c-sel" data-group="bencoding" data-value="base64" style="--cc:var(--cyan)" onclick="pickChoice(this);showXorKey()">
+                <i class="bi bi-shield-lock ci"></i>
+                <div class="cn">Base64</div>
+                <div class="cs">Standard encoding</div>
+              </div>
+              <div class="choice-card" data-group="bencoding" data-value="xor" style="--cc:var(--amber)" onclick="pickChoice(this);showXorKey()">
+                <i class="bi bi-braces ci"></i>
+                <div class="cn">XOR</div>
+                <div class="cs">XOR obfuscation</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- XOR key (shown only when xor encoding selected) -->
+          <div id="xor-key-row" class="fl" style="display:none">
+            <label class="fl-label">XOR Key (0–255) <span class="req">*</span></label>
+            <input id="beacon-xorkey" class="fl-input" type="number" value="90" min="0" max="255"/>
+            <div class="fl-hint">Single-byte key used to XOR-obfuscate the beacon payload</div>
+          </div>
+
+          <!-- Target + Port -->
+          <div class="fl-two">
+            <div class="fl">
+              <label class="fl-label">Target <span class="req">*</span></label>
+              <input id="beacon-target" class="fl-input" type="text" placeholder="192.168.1.100"/>
+              <div class="fl-hint">IP or hostname to beacon to</div>
+            </div>
+            <div class="fl">
+              <label class="fl-label">Port <span class="req">*</span></label>
+              <input id="beacon-port" class="fl-input" type="number" value="80" min="1" max="65535"/>
+              <div class="fl-hint">1 – 65535 (ignored for DNS)</div>
+            </div>
+          </div>
+
+          <!-- Count + Interval -->
+          <div class="fl-two">
+            <div class="fl">
+              <label class="fl-label">Beacon Count <span class="req">*</span></label>
+              <input id="beacon-count" class="fl-input" type="number" value="10" min="1" max="200"/>
+              <div class="fl-hint">1 – 200 beacons per campaign</div>
+            </div>
+            <div class="fl">
+              <label class="fl-label">Interval (sec) <span class="req">*</span></label>
+              <input id="beacon-interval" class="fl-input" type="number" value="10" min="1" max="3600" step="1"/>
+              <div class="fl-hint">1 – 3600 s between beacons</div>
+            </div>
+          </div>
+
+          <!-- Jitter + UA rotate -->
+          <div class="fl-two">
+            <div class="fl">
+              <label class="fl-label">Jitter % <span class="req">*</span></label>
+              <input id="beacon-jitter" class="fl-input" type="number" value="10" min="0" max="50"/>
+              <div class="fl-hint">0 – 50 % randomised interval variance</div>
+            </div>
+            <div class="fl">
+              <label class="fl-label" style="align-items:center;gap:8px">
+                <input type="checkbox" id="beacon-uarotate" checked style="accent-color:var(--cyan)"/>
+                Rotate User-Agent
+              </label>
+              <div class="fl-hint" style="margin-top:8px">Cycles through 5 browser UA strings per beacon</div>
+            </div>
+          </div>
+
+          <div id="beacon-err" class="form-err"></div>
+
+          <button id="beacon-btn" class="launch-btn" onclick="launchBeacon()">
+            <i class="bi bi-play-fill"></i> Launch Beacon Campaign
+          </button>
+        </div>
+      </div><!-- /panel-beacon -->
+
     </div><!-- /left column -->
 
     <!-- RIGHT COLUMN: terminal + status -->
@@ -621,6 +787,8 @@
                 <span class="sev sev-INFO">DGA</span>
               {% elif task.module == 'exfil' %}
                 <span class="sev sev-MEDIUM">EXFIL</span>
+              {% elif task.module == 'beacon' %}
+                <span class="sev sev-HIGH">BEACON</span>
               {% else %}
                 <span class="sev sev-NONE">{{ task.module|upper }}</span>
               {% endif %}
@@ -656,6 +824,11 @@
                   </a>
                 {% elif task.module == 'exfil' %}
                   <a href="{% url 'scanner:exfil_detail' task.result_pk %}"
+                     style="font-family:var(--mono);font-size:10px;color:var(--cyan-dim)">
+                    Result →
+                  </a>
+                {% elif task.module == 'beacon' %}
+                  <a href="{% url 'scanner:beacon_detail' task.result_pk %}"
                      style="font-family:var(--mono);font-size:10px;color:var(--cyan-dim)">
                     Result →
                   </a>
@@ -922,6 +1095,11 @@ async function launchExfil() {
       { showErr('exfil', 'Drip interval: 1 – 300 seconds.'); return; }
   if (profile === 'jitter' && (isNaN(jMin) || isNaN(jMax) || jMin >= jMax || jMax > 120))
       { showErr('exfil', 'Jitter: min < max, and max ≤ 120 s.'); return; }
+  const technique = techCard.dataset.value;
+  if (technique === 'sqli') {
+    const sp = document.getElementById('sqli-param')?.value.trim();
+    if (!sp) { showErr('exfil', 'Vulnerable parameter is required for SQLi.'); return; }
+  }
 
   // ── Build payload fields depending on mode ────────────────────────────
   let payloadFields = {};
@@ -938,7 +1116,6 @@ async function launchExfil() {
     if (!p)  { showErr('exfil', 'Payload not found in cache — reload the page.'); return; }
     payloadFields = {
       payload_mode:     'manual',
-      payload_type: 'custom',
       payload_id:       p.id,
       payload_url:      p.download_url,
       payload_checksum: p.checksum,
@@ -955,8 +1132,26 @@ async function launchExfil() {
     drip_interval: drip,
     jitter_min:    jMin,
     jitter_max:    jMax,
+    sqli_param:    (document.getElementById('sqli-param')?.value.trim()  || 'id'),
+    sqli_columns:  (parseInt(document.getElementById('sqli-columns')?.value) || 3),
     ...payloadFields,
   });
+}
+
+
+/* ── Technique change — show/hide SQLi-specific fields ────────────────────── */
+function onTechChange() {
+  const card = document.querySelector('.choice-card[data-group="technique"].c-sel');
+  const isSqli = card && card.dataset.value === 'sqli';
+  const sqliOpts = document.getElementById('sqli-opts');
+  if (sqliOpts) sqliOpts.style.display = isSqli ? '' : 'none';
+  // Hide payload source cards and payload type selector for SQLi
+  const pmodeWrap = document.querySelector('.choice-card[data-group="pmode"]')?.closest('.fl');
+  if (pmodeWrap) pmodeWrap.style.display = isSqli ? 'none' : '';
+  const generatedOpts = document.getElementById('generated-opts');
+  if (generatedOpts) generatedOpts.style.display = isSqli ? 'none' : '';
+  const manualOpts = document.getElementById('manual-opts');
+  if (manualOpts && isSqli) manualOpts.style.display = 'none';
 }
 
 /* ── Common dispatch ───────────────────────────────────────────────────── */
@@ -1103,6 +1298,50 @@ function setBusy(mod, busy) {
   btn.innerHTML = busy
     ? '<i class="bi bi-hourglass-split"></i> Dispatching…'
     : `<i class="bi bi-play-fill"></i> Launch ${mod.toUpperCase()}`;
+}
+
+/* ── Beacon launch ─────────────────────────────────────────────────────── */
+function showXorKey() {
+  const card = document.querySelector('.choice-card[data-group="bencoding"].c-sel');
+  const row  = document.getElementById('xor-key-row');
+  if (row) row.style.display = (card && card.dataset.value === 'xor') ? '' : 'none';
+}
+
+async function launchBeacon() {
+  clearErr('beacon');
+  const agentId = document.getElementById('agent-select').value;
+  if (!agentId) { showErr('beacon', 'Select a target agent first.'); return; }
+
+  const protoCard = document.querySelector('.choice-card[data-group="bprotocol"].c-sel');
+  const encCard   = document.querySelector('.choice-card[data-group="bencoding"].c-sel');
+  const target    = document.getElementById('beacon-target').value.trim();
+  const port      = parseInt(document.getElementById('beacon-port').value, 10);
+  const count     = parseInt(document.getElementById('beacon-count').value, 10);
+  const interval  = parseFloat(document.getElementById('beacon-interval').value);
+  const jitter    = parseInt(document.getElementById('beacon-jitter').value, 10);
+  const uaRotate  = document.getElementById('beacon-uarotate').checked;
+  const xorKey    = parseInt(document.getElementById('beacon-xorkey')?.value || '90', 10);
+
+  if (!protoCard)                             { showErr('beacon', 'Select a protocol.'); return; }
+  if (!encCard)                               { showErr('beacon', 'Select an encoding.'); return; }
+  if (!target)                                { showErr('beacon', 'Target IP or hostname is required.'); return; }
+  if (isNaN(port)  || port  < 1  || port > 65535)  { showErr('beacon', 'Port must be 1 – 65535.'); return; }
+  if (isNaN(count) || count < 1  || count > 200)    { showErr('beacon', 'Count must be 1 – 200.'); return; }
+  if (isNaN(interval) || interval < 1 || interval > 3600) { showErr('beacon', 'Interval must be 1 – 3600 s.'); return; }
+  if (isNaN(jitter)   || jitter  < 0  || jitter  > 50)   { showErr('beacon', 'Jitter must be 0 – 50 %.'); return; }
+
+  await doDispatch('beacon', '/api/modules/beacon/dispatch/', {
+    agent_id:          agentId,
+    protocol:          protoCard.dataset.value,
+    encoding:          encCard.dataset.value,
+    target:            target,
+    port:              port,
+    count:             count,
+    interval_sec:      interval,
+    jitter_pct:        jitter,
+    user_agent_rotate: uaRotate,
+    xor_key:           xorKey,
+  });
 }
 
 /* ── DOM helpers ───────────────────────────────────────────────────────── */

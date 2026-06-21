@@ -127,6 +127,9 @@ USE_TZ        = True
 
 STATIC_URL = 'static/'
 
+MEDIA_URL  = '/media/'
+MEDIA_ROOT = BASE_DIR / 'media'
+
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 
@@ -171,6 +174,16 @@ JWT_REFRESH_EXPIRY_MINUTES = 1440
 AGENT_REGISTRATION_KEY = os.environ.get(
     'AGENT_REGISTRATION_KEY',
     'change-this-to-something-strong'
+)
+
+
+# ── JWT signing secret (separate from Django SECRET_KEY) ─────────────────────
+# Set MIAT_JWT_SECRET in the environment for production deployments.
+# Keeping this distinct from SECRET_KEY means rotating one doesn't break the other.
+
+MIAT_JWT_SECRET = os.environ.get(
+    'MIAT_JWT_SECRET',
+    SECRET_KEY,   # falls back to Django secret — acceptable for dev/lab only
 )
 
 

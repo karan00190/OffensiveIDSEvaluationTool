@@ -47,6 +47,11 @@
     color: var(--red);
     background: rgba(255, 68, 85, 0.06);
   }
+  .tech-sqli {
+    border-color: rgba(168, 85, 247, 0.3);
+    color: #a855f7;
+    background: rgba(168, 85, 247, 0.06);
+  }
   .tech-badge {
     font-family: var(--mono);
     font-size: 9px;
@@ -101,8 +106,8 @@
       <div class="pg-eyebrow">IDS Evaluation</div>
       <div class="pg-title">Data Exfiltration Results</div>
       <div class="pg-sub">
-        DNS TUNNELLING · HTTP INJECTION · ICMP STUFFING &nbsp;·&nbsp; {{
-        total_runs }} RUNS
+        DNS TUNNELLING · HTTP INJECTION · ICMP STUFFING &nbsp;·&nbsp; 
+        {{ total_runs }} RUNS
       </div>
     </div>
   </div>
@@ -158,7 +163,7 @@
             </td>
             <td>
               <span
-                class="tech-badge {% if r.technique == 'dns' %}tech-dns {% elif r.technique == 'http' %}tech-http {% else %}tech-icmp{% endif %}"
+                class="tech-badge {% if r.technique == 'dns' %}tech-dns{% elif r.technique == 'http' %}tech-http{% elif r.technique == 'sqli' %}tech-sqli{% else %}tech-icmp{% endif %}"
               >
                 {{ r.technique|upper }}
               </span>

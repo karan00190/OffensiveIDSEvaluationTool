@@ -58,6 +58,17 @@ def api_exfil_results(request):
     agent     = request.user
     data      = request.data
 
+    # If the orchestrator sent a failure report, mark the task failed — no result row.
+    if data.get('error'):
+        _close_moduletask_loop(
+            task_id_str=str(data.get('task_id', '')),
+            result_pk=0,
+            module='exfil',
+            failed=True,
+            error_message=str(data['error']),
+        )
+        return Response({'received': True, 'error': data['error']}, status=200)
+
     agent_model = None
     if hasattr(agent, 'agent_id'):
         try:
@@ -69,6 +80,7 @@ def api_exfil_results(request):
         'dns':  ExfilTechnique.DNS,
         'http': ExfilTechnique.HTTP,
         'icmp': ExfilTechnique.ICMP,
+        'sqli': ExfilTechnique.SQLI,
     }
     prof_map = {
         'burst':     ExfilProfile.BURST,

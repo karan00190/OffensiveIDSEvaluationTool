@@ -14,8 +14,8 @@ from django.conf import settings
 
 logger = logging.getLogger('MIAT.JWTAuth')
 
-ACCESS_EXPIRY  = 15 * 60       # 15 minutes
-REFRESH_EXPIRY = 7 * 24 * 3600 # 7 days
+ACCESS_EXPIRY  = getattr(settings, 'JWT_ACCESS_EXPIRY_MINUTES',  15)   * 60
+REFRESH_EXPIRY = getattr(settings, 'JWT_REFRESH_EXPIRY_MINUTES', 1440) * 60
 
 _SECRET = getattr(settings, 'MIAT_JWT_SECRET', settings.SECRET_KEY)
 _ALGO   = 'HS256'

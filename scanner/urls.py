@@ -8,8 +8,10 @@ from . import (
     token_views,
     dga_views,
     exfil_views,
+    beacon_views,
     module_views,
     payload_views,
+    export_views,
 )
 
 app_name = 'scanner'
@@ -126,6 +128,10 @@ urlpatterns = [
          agent_views.agent_register,
          name='agent_register_api'),
 
+    path('api/agent/capabilities/',
+         agent_views.agent_capabilities,
+         name='agent_capabilities'),
+
     path('api/agent/heartbeat/',
          agent_views.agent_heartbeat,
          name='agent_heartbeat'),
@@ -152,6 +158,11 @@ urlpatterns = [
          exfil_views.api_exfil_results,
          name='api_exfil_results'),
 
+    # ── Nmap API (agent telemetry) ────────────────────────────────────────────
+    path('api/agent/nmap/results/',
+         agent_views.api_nmap_results,
+         name='api_nmap_results'),
+
     # ── Pull-Model Payload Management (browser) ───────────────────────────────
     path('modules/payloads/',
          payload_views.payload_manager_view,
@@ -176,4 +187,43 @@ urlpatterns = [
     path('api/agent/payload/<int:payload_id>/download/',
          payload_views.payload_download,
          name='api_payload_download'),
+
+    # ── Beacon (browser) ──────────────────────────────────────────────────────
+    path('beacon/',
+         beacon_views.beacon_dashboard,
+         name='beacon_dashboard'),
+
+    path('beacon/<int:pk>/',
+         beacon_views.beacon_detail,
+         name='beacon_detail'),
+
+    path('beacon/<int:pk>/mark/',
+         beacon_views.beacon_mark_detected,
+         name='beacon_mark_detected'),
+
+    # ── Beacon dispatch + API (agent telemetry) ───────────────────────────────
+    path('api/modules/beacon/dispatch/',
+         beacon_views.dispatch_beacon_task,
+         name='api_dispatch_beacon'),
+
+    path('api/agent/beacon/results/',
+         beacon_views.api_beacon_results,
+         name='api_beacon_results'),
+
+    # ── Export endpoints (CSV + PDF) ──────────────────────────────────────────
+    path('dga/<int:pk>/export/',
+         export_views.export_dga,
+         name='export_dga'),
+
+    path('exfil/<int:pk>/export/',
+         export_views.export_exfil,
+         name='export_exfil'),
+
+    path('scan/<int:pk>/export/',
+         export_views.export_scan,
+         name='export_scan'),
+
+    path('beacon/<int:pk>/export/',
+         export_views.export_beacon,
+         name='export_beacon'),
 ]

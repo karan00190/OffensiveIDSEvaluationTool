@@ -97,6 +97,7 @@ class Orchestrator:
         )
         self.telemetry.ws_thread = self.ws_thread
         self.ws_thread.start()
+        self.plugins.set_ws_thread(self.ws_thread)
 
         asyncio.create_task(self.telemetry.run(), name='telemetry')
 
@@ -294,7 +295,7 @@ class Orchestrator:
 
     async def _stop_all_plugins(self) -> None:
         self.plugins.stop_all()
-        for name, task in self._active_tasks.items():
+        for _, task in self._active_tasks.items():
             if not task.done():
                 task.cancel()
         logger.info("All plugins stopped")

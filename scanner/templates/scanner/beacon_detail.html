@@ -1,0 +1,218 @@
+<!-- scanner/templates/scanner/beacon_detail.html -->
+{% extends "scanner/base.html" %}
+{% block title %}Beacon Run #{{ result.pk }}{% endblock %}
+
+{% block content %}
+<div>
+
+  <!-- Breadcrumb -->
+  <div style="font-family:var(--mono);font-size:11px;color:var(--text-dim);margin-bottom:1.25rem">
+    <a href="{% url 'scanner:beacon_dashboard' %}" style="color:var(--cyan-dim);text-decoration:none">
+      Beacon Suite
+    </a>
+    &nbsp;/&nbsp; Run #{{ result.pk }}
+  </div>
+
+  <!-- Page header -->
+  <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:1.5rem;flex-wrap:wrap;gap:1rem">
+    <div>
+      <div style="font-family:var(--mono);font-size:10px;letter-spacing:2px;color:var(--text-dim);text-transform:uppercase;margin-bottom:6px">
+        C2 Beacon Run #{{ result.pk }}
+      </div>
+      <div style="font-family:var(--cond);font-size:26px;font-weight:700;letter-spacing:2px">
+        {{ result.protocol|upper }} / {{ result.encoding|upper }}
+        <span style="font-size:16px;color:var(--text-dim)">&nbsp;→ {{ result.target }}</span>
+      </div>
+      <div style="font-family:var(--mono);font-size:11px;color:var(--text-dim);margin-top:4px">
+        Session {{ result.session_id }} &nbsp;·&nbsp; {{ result.created_at|date:"Y-m-d H:i:s" }} UTC
+      </div>
+    </div>
+    <div style="display:flex;gap:.5rem;flex-wrap:wrap">
+      <!-- IDS status badge -->
+      <div>
+        {% if result.ids_detected is None %}
+          <span class="sev sev-NONE" style="font-size:13px;padding:6px 14px">? Unverified</span>
+        {% elif result.ids_detected %}
+          <span class="sev sev-HIGH" style="font-size:13px;padding:6px 14px">&#x26A0; IDS Detected</span>
+        {% else %}
+          <span class="sev sev-INFO" style="font-size:13px;padding:6px 14px;color:var(--green)">&#x2713; IDS Evaded</span>
+        {% endif %}
+      </div>
+      <!-- Export buttons -->
+      <a href="{% url 'scanner:export_beacon' result.pk %}?format=csv"
+         class="btn btn-outline" style="font-size:12px">
+        <i class="bi bi-filetype-csv"></i> CSV
+      </a>
+      <a href="{% url 'scanner:export_beacon' result.pk %}?format=pdf"
+         class="btn btn-outline" style="font-size:12px">
+        <i class="bi bi-filetype-pdf"></i> PDF
+      </a>
+    </div>
+  </div>
+
+  {% if messages %}
+  {% for msg in messages %}
+  <div style="background:rgba(0,212,255,.07);border:1px solid rgba(0,212,255,.25);border-radius:6px;padding:10px 14px;font-family:var(--mono);font-size:12px;color:var(--cyan);margin-bottom:1rem">
+    {{ msg }}
+  </div>
+  {% endfor %}
+  {% endif %}
+
+  <!-- Stats row -->
+  <div class="stat-grid" style="grid-template-columns:repeat(4,1fr);margin-bottom:1.5rem">
+    <div class="stat-card">
+      <div class="stat-label">Total Beacons</div>
+      <div class="stat-value">{{ result.total_beacons }}</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Successful</div>
+      <div class="stat-value" style="color:var(--green)">{{ result.successful }}</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Failed</div>
+      <div class="stat-value" style="color:{% if result.failed > 0 %}var(--red){% else %}var(--text-dim){% endif %}">{{ result.failed }}</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Avg Latency</div>
+      <div class="stat-value">{{ result.avg_latency_ms|floatformat:1 }} ms</div>
+    </div>
+  </div>
+
+  <!-- Config + IDS side by side -->
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.5rem;margin-bottom:1.5rem">
+
+    <!-- Campaign config -->
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title"><i class="bi bi-gear"></i> Campaign Configuration</div>
+      </div>
+      <div style="padding:1.25rem">
+        {% with kv_items="Protocol:protocol,Encoding:encoding,Target:target,Beacons:total_beacons,Interval (s):interval_sec,Jitter (%):jitter_pct,Jitter Std (s):std_dev_sec" %}
+        <table style="width:100%;border-collapse:collapse;font-family:var(--mono);font-size:12px">
+          <tr><td style="color:var(--text-dim);padding:6px 0;border-bottom:1px solid rgba(0,212,255,.05);width:44%">Protocol</td><td style="padding:6px 0;border-bottom:1px solid rgba(0,212,255,.05)">{{ result.protocol|upper }}</td></tr>
+          <tr><td style="color:var(--text-dim);padding:6px 0;border-bottom:1px solid rgba(0,212,255,.05)">Encoding</td><td style="padding:6px 0;border-bottom:1px solid rgba(0,212,255,.05)">{{ result.encoding|upper }}</td></tr>
+          <tr><td style="color:var(--text-dim);padding:6px 0;border-bottom:1px solid rgba(0,212,255,.05)">Target</td><td style="padding:6px 0;border-bottom:1px solid rgba(0,212,255,.05);color:var(--cyan)">{{ result.target }}</td></tr>
+          <tr><td style="color:var(--text-dim);padding:6px 0;border-bottom:1px solid rgba(0,212,255,.05)">Session ID</td><td style="padding:6px 0;border-bottom:1px solid rgba(0,212,255,.05)">{{ result.session_id }}</td></tr>
+          <tr><td style="color:var(--text-dim);padding:6px 0;border-bottom:1px solid rgba(0,212,255,.05)">Interval</td><td style="padding:6px 0;border-bottom:1px solid rgba(0,212,255,.05)">{{ result.interval_sec }} s</td></tr>
+          <tr><td style="color:var(--text-dim);padding:6px 0;border-bottom:1px solid rgba(0,212,255,.05)">Jitter</td><td style="padding:6px 0;border-bottom:1px solid rgba(0,212,255,.05)">±{{ result.jitter_pct }}%</td></tr>
+          <tr><td style="color:var(--text-dim);padding:6px 0">Interval Std Dev</td><td style="padding:6px 0">{{ result.std_dev_sec }} s</td></tr>
+        </table>
+        {% endwith %}
+      </div>
+    </div>
+
+    <!-- IDS assessment -->
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title"><i class="bi bi-shield"></i> IDS Assessment</div>
+      </div>
+      <div style="padding:1.25rem">
+
+        <!-- Mark form -->
+        <form method="post" action="{% url 'scanner:beacon_mark_detected' result.pk %}">
+          {% csrf_token %}
+          <div style="display:flex;gap:.75rem;margin-bottom:1rem">
+            <button type="submit" name="detected" value="true"
+                    class="btn {% if result.ids_detected == True %}btn-primary{% else %}btn-outline{% endif %}"
+                    style="flex:1;justify-content:center;font-size:12px">
+              <i class="bi bi-exclamation-triangle"></i> Detected
+            </button>
+            <button type="submit" name="detected" value="false"
+                    class="btn {% if result.ids_detected == False %}btn-primary{% else %}btn-outline{% endif %}"
+                    style="flex:1;justify-content:center;font-size:12px">
+              <i class="bi bi-shield-check"></i> Evaded
+            </button>
+          </div>
+          <textarea name="notes" class="fl-input" rows="3"
+                    placeholder="Add IDS detection notes…"
+                    style="resize:vertical;width:100%;background:var(--bg-deep);border:1px solid var(--border);border-radius:6px;padding:8px 12px;color:var(--text-pri);font-family:var(--mono);font-size:11px;box-sizing:border-box">{{ result.ids_detection_notes }}</textarea>
+          <button type="submit" name="detected" value="{{ result.ids_detected|yesno:'true,false,false' }}"
+                  class="btn btn-outline" style="width:100%;margin-top:.5rem;justify-content:center;font-size:11px">
+            <i class="bi bi-save"></i> Save Notes
+          </button>
+        </form>
+
+        <!-- IDS Signatures -->
+        {% if result.ids_signatures %}
+        <div style="margin-top:1.25rem">
+          <div style="font-family:var(--mono);font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--text-dim);margin-bottom:.5rem">
+            Known IDS Signatures
+          </div>
+          {% for sig in result.ids_signatures %}
+          <div style="display:flex;gap:8px;align-items:flex-start;padding:5px 0;border-bottom:1px solid rgba(0,212,255,.05);font-family:var(--mono);font-size:11px;color:var(--text-sec)">
+            <span style="color:var(--amber);flex-shrink:0">⚑</span>{{ sig }}
+          </div>
+          {% endfor %}
+        </div>
+        {% endif %}
+
+      </div>
+    </div>
+  </div>
+
+  <!-- Beacon timeline table -->
+  <div class="section-header">
+    <div class="section-title">Beacon Timeline</div>
+    <span style="font-family:var(--mono);font-size:10px;color:var(--text-dim)">
+      {{ beacons|length }} RECORD{{ beacons|length|pluralize:"S" }}
+    </span>
+  </div>
+
+  <div class="card">
+    {% if beacons %}
+    <div style="overflow-x:auto">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Timestamp</th>
+            <th>Encoding</th>
+            <th>Status / Outcome</th>
+            <th>Latency</th>
+            <th>Sleep (actual)</th>
+            <th>Error</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for b in beacons %}
+          <tr>
+            <td class="mono" style="color:var(--text-dim)">{{ b.sequence }}</td>
+            <td class="mono" style="font-size:10px;color:var(--text-dim)">
+              {{ b.timestamp|slice:":19" }}
+            </td>
+            <td class="mono" style="font-size:11px">{{ b.encoding|upper }}</td>
+            <td class="mono" style="font-size:11px">
+              {% if b.sent %}
+                <span style="color:var(--green)">
+                  ✓ {% if b.http_status %}{{ b.http_status }}{% elif b.outcome %}{{ b.outcome }}{% else %}SENT{% endif %}
+                </span>
+              {% else %}
+                <span style="color:var(--red)">✗ FAIL</span>
+              {% endif %}
+            </td>
+            <td class="mono" style="font-size:11px">{{ b.latency_ms }} ms</td>
+            <td class="mono" style="font-size:11px;color:var(--text-dim)">
+              {% if b.actual_interval_sec %}{{ b.actual_interval_sec }} s{% else %}—{% endif %}
+            </td>
+            <td class="mono" style="font-size:10px;color:var(--red)">
+              {% if b.error %}{{ b.error|truncatechars:50 }}{% else %}—{% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div style="text-align:center;padding:3rem;font-family:var(--mono);font-size:12px;color:var(--text-dim)">
+      No per-beacon records available.
+    </div>
+    {% endif %}
+  </div>
+
+</div>
+
+<style>
+.fl-input { background:var(--bg-deep);border:1px solid var(--border);border-radius:6px;padding:10px 14px;color:var(--text-pri);font-family:var(--mono);font-size:12px;outline:none;transition:border-color .2s;-webkit-appearance:none;width:100%;box-sizing:border-box; }
+.fl-input:focus { border-color:var(--cyan); }
+</style>
+{% endblock %}

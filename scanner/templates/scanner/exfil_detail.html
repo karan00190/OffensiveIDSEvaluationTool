@@ -24,6 +24,11 @@
     color: var(--red);
     background: rgba(255, 68, 85, 0.06);
   }
+  .tech-sqli {
+    border-color: rgba(168, 85, 247, 0.3);
+    color: #a855f7;
+    background: rgba(168, 85, 247, 0.06);
+  }
   .tech-badge {
     font-family: var(--mono);
     font-size: 10px;
@@ -165,7 +170,7 @@
   }
 </style>
 {% endblock %} {% block content %}
-<div style="max-width: 1100px">
+<div>
   <div
     style="
       display: flex;
@@ -199,7 +204,7 @@
       >
         <div class="pg-title">Run #{{ result.pk }}</div>
         <span
-          class="tech-badge {% if result.technique == 'dns' %}tech-dns{% elif result.technique == 'http' %}tech-http{% else %}tech-icmp{% endif %}"
+          class="tech-badge {% if result.technique == 'dns' %}tech-dns{% elif result.technique == 'http' %}tech-http{% elif result.technique == 'sqli' %}tech-sqli{% else %}tech-icmp{% endif %}"
         >
           {{ result.get_technique_display }}
         </span>
@@ -216,9 +221,19 @@
         unknown{% endif %} &nbsp;·&nbsp; Profile: {{ result.get_profile_display }}
       </div>
     </div>
-    <a href="{% url 'scanner:exfil_dashboard' %}" class="btn btn-outline">
-      <i class="bi bi-arrow-left"></i> All Runs
-    </a>
+    <div style="display:flex;gap:.5rem">
+      <a href="{% url 'scanner:export_exfil' result.pk %}?format=csv"
+         class="btn btn-outline" style="font-size:12px">
+        <i class="bi bi-filetype-csv"></i> CSV
+      </a>
+      <a href="{% url 'scanner:export_exfil' result.pk %}?format=pdf"
+         class="btn btn-outline" style="font-size:12px">
+        <i class="bi bi-filetype-pdf"></i> PDF
+      </a>
+      <a href="{% url 'scanner:exfil_dashboard' %}" class="btn btn-outline">
+        <i class="bi bi-arrow-left"></i> All Runs
+      </a>
+    </div>
   </div>
 
   <!-- Detection banner -->
@@ -366,6 +381,10 @@
                 <th>Header</th>
                 <th>Value (truncated)</th>
                 <th>HTTP Status</th>
+                {% elif result.technique == 'sqli' %}
+                <th>Injection URL</th>
+                <th>Payload (hex)</th>
+                <th>HTTP Status</th>
                 {% else %}
                 <th>Target IP</th>
                 <th>Payload B</th>
@@ -386,32 +405,45 @@
                 </td>
                 {% if result.technique == 'dns' %}
                 <td class="mono" style="font-size: 11px; color: var(--cyan)">
-                  {{ p.query_domain|default:p.encoded_label|truncatechars:50 }}
+                  {{ p.query_domain|default:"—"|truncatechars:50 }}
                 </td>
                 <td class="mono" style="font-size: 11px">
-                  {{ p.label_length }}
+                  {{ p.label_length|default:"—" }}
                 </td>
                 <td
                   class="mono"
                   style="font-size:11px;{% if p.outcome == 'NXDOMAIN' %}color:var(--amber){% elif p.outcome == 'RESOLVED' %}color:var(--green){% else %}color:var(--red){% endif %}"
                 >
-                  {{ p.outcome }}
+                  {{ p.outcome|default:"ERR" }}
                 </td>
                 {% elif result.technique == 'http' %}
                 <td class="mono" style="font-size: 11px; color: var(--amber)">
-                  {{ p.header_name }}
+                  {{ p.header_name|default:"—" }}
                 </td>
                 <td
                   class="mono"
                   style="font-size: 10px; color: var(--text-sec)"
                 >
-                  {{ p.header_value|truncatechars:50 }}
+                  {{ p.header_value|default:"—"|truncatechars:50 }}
                 </td>
                 <td
                   class="mono"
                   style="font-size:11px;{% if p.http_status == 200 %}color:var(--green){% elif p.http_status == 0 %}color:var(--red){% else %}color:var(--amber){% endif %}"
                 >
-                  {{ p.http_status|default:"—" }}
+                  {{ p.http_status|default_if_none:"—" }}
+                </td>
+                {% elif result.technique == 'sqli' %}
+                <td class="mono" style="font-size: 10px; color: #a855f7; max-width: 320px; word-break: break-all">
+                  {{ p.injection_url|default:"—"|truncatechars:90 }}
+                </td>
+                <td class="mono" style="font-size: 10px; color: var(--text-sec)">
+                  {{ p.payload_hex|default:"—" }}
+                </td>
+                <td
+                  class="mono"
+                  style="font-size:11px;{% if p.http_status == 200 %}color:var(--green){% elif p.http_status == 0 %}color:var(--red){% else %}color:var(--amber){% endif %}"
+                >
+                  {{ p.http_status|default_if_none:"—" }}
                 </td>
                 {% else %}
                 <td class="mono" style="font-size: 11px; color: var(--cyan)">
@@ -447,7 +479,7 @@
               {% empty %}
               <tr>
                 <td
-                  colspan="5"
+                  colspan="6"
                   style="
                     text-align: center;
                     padding: 2rem;
@@ -522,15 +554,20 @@
           {% if result.technique == 'dns' %}
           <strong style="color: var(--cyan)">DNS Tunnelling</strong><br />
           Data encoded as Base32 subdomain labels and sent via DNS queries. IDS
-          detects unusually long labels and high query volume. 
+          detects unusually long labels and high query volume.
           {% elif result.technique == 'http' %}
-          <strong style="color: var(--amber)">HTTP Header Injection</strong
-          ><br />
+          <strong style="color: var(--amber)">HTTP Header Injection</strong><br />
           Data hidden in HTTP request headers (User-Agent, X-Request-ID, etc.).
-          Requires deep packet inspection to detect. {% else %}
+          Requires deep packet inspection to detect.
+          {% elif result.technique == 'sqli' %}
+          <strong style="color: #a855f7">SQL Injection Exfiltration</strong><br />
+          Data hex-encoded into UNION SELECT payloads sent as HTTP GET parameters.
+          IDS detects SQL keywords and hex patterns in query strings.
+          {% else %}
           <strong style="color: var(--red)">ICMP Payload Stuffing</strong><br />
           Data embedded in ICMP echo payload beyond the normal 8 bytes. IDS
-          detects oversized payloads via DPI. {% endif %}
+          detects oversized payloads via DPI.
+          {% endif %}
         </div>
       </div>
     </div>

@@ -5,7 +5,6 @@
 #   'task.complete' event to the dashboard WebSocket group so the browser
 #   control panel redirects automatically.
 
-import json
 import logging
 from datetime import date
 
@@ -13,10 +12,9 @@ from django.shortcuts               import render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required
 from django.views.decorators.http   import require_http_methods
 from django.contrib                 import messages
-from django.utils                   import timezone
 
 from rest_framework.decorators  import api_view, authentication_classes, permission_classes
-from rest_framework.permissions import IsAuthenticated, AllowAny
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.response    import Response
 from rest_framework             import status
 
@@ -30,23 +28,33 @@ logger = logging.getLogger(__name__)
 # PRIVATE HELPER — close ModuleTask loop
 # =============================================================================
 
-def _close_moduletask_loop(task_id_str: str, result_pk: int, module: str) -> None:
+def _close_moduletask_loop(
+    task_id_str: str,
+    result_pk: int,
+    module: str,
+    failed: bool = False,
+    error_message: str = '',
+) -> None:
     """
-    Called after a result row is committed to the database.
-    Finds the ModuleTask by task_id, marks it complete, and pushes a
-    'task.complete' event to the 'dashboard' channel group so every
-    connected browser receives the result deep-link without polling.
-
-    Designed to be silent on failure — a missing or stale task_id must
-    never cause the API view to return an error to the agent.
+    Called after a result row is committed (or on agent-reported failure).
+    On success: marks ModuleTask COMPLETE and pushes a 'task.complete' WS event.
+    On failure: marks ModuleTask FAILED — no WS push, no result_url.
+    Designed to be silent on error — never propagates exceptions to API callers.
     """
     if not task_id_str:
         return
 
-    # ── Mark the task complete in the DB ─────────────────────────────────────
+    # ── Mark the task in the DB ───────────────────────────────────────────────
     task = None
     try:
         task = ModuleTask.objects.get(task_id=task_id_str)
+        if failed:
+            task.mark_failed(error_message or 'Agent reported execution failure')
+            logger.info(
+                f"ModuleTask {task.task_id_short} → FAILED "
+                f"(module={module}, reason={error_message!r})"
+            )
+            return
         task.mark_complete(result_pk)
         logger.info(
             f"ModuleTask {task.task_id_short} → COMPLETE "
@@ -64,9 +72,10 @@ def _close_moduletask_loop(task_id_str: str, result_pk: int, module: str) -> Non
 
     # ── Push real-time notification to browser dashboards ────────────────────
     result_url_map = {
-        'dga':   f'/dga/{result_pk}/',
-        'exfil': f'/exfil/{result_pk}/',
-        'nmap':  f'/scan/{result_pk}/report/',
+        'dga':    f'/dga/{result_pk}/',
+        'exfil':  f'/exfil/{result_pk}/',
+        'nmap':   f'/scan/{result_pk}/report/',
+        'beacon': f'/beacon/{result_pk}/',
     }
     result_url = result_url_map.get(module, f'/{module}/{result_pk}/')
 
@@ -136,6 +145,17 @@ def api_dga_results(request):
     """
     agent = request.user
     data  = request.data
+
+    # If the orchestrator sent a failure report, mark the task failed — no result row.
+    if data.get('error'):
+        _close_moduletask_loop(
+            task_id_str=str(data.get('task_id', '')),
+            result_pk=0,
+            module='dga',
+            failed=True,
+            error_message=str(data['error']),
+        )
+        return Response({'received': True, 'error': data['error']}, status=200)
 
     # Look up the agent model instance
     agent_model = None

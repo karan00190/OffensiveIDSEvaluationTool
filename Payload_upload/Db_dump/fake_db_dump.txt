@@ -1,0 +1,13 @@
+-- USERS TABLE DUMP
+INSERT INTO users VALUES (1,'admin','$2b$12$hash1','admin@corp.com','superadmin',1);
+INSERT INTO users VALUES (2,'jsmith','$2b$12$hash2','j.smith@corp.com','user',1);
+INSERT INTO users VALUES (3,'sconnor','$2b$12$hash3','s.connor@corp.com','manager',1);
+
+-- SESSIONS TABLE DUMP
+INSERT INTO sessions VALUES ('abc123','admin','2024-01-15 08:30:00','192.168.1.50');
+INSERT INTO sessions VALUES ('def456','jsmith','2024-01-15 09:12:00','10.0.0.22');
+
+-- CONFIG TABLE DUMP
+INSERT INTO config VALUES ('smtp_password','Mailpass#2024!');
+INSERT INTO config VALUES ('backup_key','bkp_xK9mP2nQ8rT5vW1y');
+INSERT INTO config VALUES ('encryption_key','enc_aes256_zXcVbNmKjHgFdSaP');
