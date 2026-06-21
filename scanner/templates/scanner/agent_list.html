@@ -307,7 +307,7 @@
       <i class="bi bi-info-circle"></i> &nbsp;What is an Agent?
     </div>
     <div class="ib-body">
-      An agent is a Python script (<span class="ib-code">agent.py</span>) that
+      An agent is a Python script (<span class="ib-code">orchestrator.py</span>) that
       runs on an endpoint inside the BARC lab network. It performs controlled
       attacks (nmap scans, DGA queries, data exfiltration simulations) and
       reports results back to this server. Each agent authenticates using a
@@ -413,22 +413,22 @@
         After registering — run these commands on your lab endpoint:
       </div>
       <div>
-        <span style="color: var(--text-dim)"># 1. Copy agent.py to your lab machine, then register:</span>
+        <span style="color: var(--text-dim)"># 1. Copy orchestrator.py to your lab machine, then register:</span>
       </div>
       <div>
-        <span style="color: var(--cyan)">python agent.py</span>
+        <span style="color: var(--cyan)">python orchestrator.py</span>
         <span style="color: var(--amber)">--register</span>
         <span style="color: var(--text-sec)">--agent-id barc-lab-01 --reg-key YOUR_REGISTRATION_KEY</span>
       </div>
       <div style="margin-top: 0.25rem">
         <span style="color: var(--text-dim)"># 2. Start the persistent agent:</span>
       </div>
-      <div><span style="color: var(--cyan)">python agent.py</span></div>
+      <div><span style="color: var(--cyan)">python orchestrator.py</span></div>
       <div style="margin-top: 0.25rem">
         <span style="color: var(--text-dim)"># 3. Or run a single scan:</span>
       </div>
       <div>
-        <span style="color: var(--cyan)">python agent.py</span>
+        <span style="color: var(--cyan)">python orchestrator.py</span>
         <span style="color: var(--amber)">--scan</span>
         <span style="color: var(--text-sec)">192.168.1.1 --profile fast</span>
       </div>
